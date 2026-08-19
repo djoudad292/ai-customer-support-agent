@@ -53,19 +53,35 @@ export class AgentService {
     })) || [];
 
     // Use stream to get intermediate steps
-    const stream = await this.agentGraph.getCompiledGraph().stream({
-      messages: [...history, { role: 'human', content: message }],
-      companyId,
-      conversationId,
-      pendingAction: null,
-      pendingActionData: null,
-      response: '',
-    });
-
     let finalResult;
-    for await (const update of stream) {
-      this.trace.push(update);
-      finalResult = update;
+    try {
+      const stream = await this.agentGraph.getCompiledGraph().stream({
+        messages: [...history, { role: 'human', content: message }],
+        companyId,
+        conversationId,
+        pendingAction: null,
+        pendingActionData: null,
+        response: '',
+      });
+
+      for await (const update of stream) {
+        this.trace.push(update);
+        finalResult = update;
+      }
+    } catch (streamError) {
+      this.logger.error(`Stream error: ${streamError}`);
+      // Fallback to invoke
+      const result = await this.agentGraph.invoke({
+        messages: [...history, { role: 'human', content: message }],
+        companyId,
+        conversationId,
+      });
+      return {
+        conversationId,
+        response: result.response,
+        action: result.pendingAction,
+        trace: this.trace,
+      };
     }
 
     // Get final state
