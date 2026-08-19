@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { GitBranch, MessageSquare, Ticket, BookOpen, Settings } from "lucide-react";
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<any>(null);
@@ -56,19 +57,24 @@ export default function DashboardPage() {
         <h3 className="mb-4 text-lg font-semibold">Quick Actions</h3>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <a href="/dashboard/graph-inspector" className="rounded-lg border border-slate-700 bg-slate-800/30 p-4 text-center text-sm transition-colors hover:border-blue-500/50 hover:bg-blue-500/5">
-            🕸️ Graph Inspector
+            <GitBranch className="mb-2 h-6 w-6 text-blue-400" />
+            Graph Inspector
           </a>
           <a href="/dashboard/conversations" className="rounded-lg border border-slate-700 bg-slate-800/30 p-4 text-center text-sm transition-colors hover:border-blue-500/50 hover:bg-blue-500/5">
-            💬 View Conversations
+            <MessageSquare className="mb-2 h-6 w-6 text-blue-400 mx-auto" />
+            View Conversations
           </a>
           <a href="/dashboard/tickets" className="rounded-lg border border-slate-700 bg-slate-800/30 p-4 text-center text-sm transition-colors hover:border-yellow-500/50 hover:bg-yellow-500/5">
-            🎫 Manage Tickets
+            <Ticket className="mb-2 h-6 w-6 text-yellow-400 mx-auto" />
+            Manage Tickets
           </a>
           <a href="/dashboard/knowledge-base" className="rounded-lg border border-slate-700 bg-slate-800/30 p-4 text-center text-sm transition-colors hover:border-cyan-500/50 hover:bg-cyan-500/5">
-            📚 Knowledge Base
+            <BookOpen className="mb-2 h-6 w-6 text-cyan-400 mx-auto" />
+            Knowledge Base
           </a>
           <a href="/dashboard/settings" className="rounded-lg border border-slate-700 bg-slate-800/30 p-4 text-center text-sm transition-colors hover:border-slate-500/50 hover:bg-slate-500/5">
-            ⚙️ Settings
+            <Settings className="mb-2 h-6 w-6 text-slate-400 mx-auto" />
+            Settings
           </a>
         </div>
       </div>
