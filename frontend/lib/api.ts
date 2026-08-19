@@ -1,4 +1,4 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://customer.djaouad.tech';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://ai-customer-support-backend-ldbf.onrender.com';
 
 export async function apiFetch<T = any>(path: string, options?: RequestInit): Promise<T> {
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
