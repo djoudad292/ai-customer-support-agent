@@ -64,7 +64,7 @@ export class AgentService {
     return {
       conversationId,
       response: result.response,
-      action: result.action,
+      action: result.pendingAction,
     };
   }
 }

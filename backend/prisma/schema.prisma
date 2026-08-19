@@ -36,6 +36,8 @@ model Company {
   conversations Conversation[]
   leads         Lead[]
   appointments  Appointment[]
+  tickets       Ticket[]
+  orders        Order[]
   departments   Department[]
 
   @@map("companies")
@@ -84,6 +86,7 @@ model Conversation {
   status      String   @default("active")
   department  String?
   handledBy   String?  @map("handled_by")
+  escalatedAt DateTime? @map("escalated_at")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
@@ -91,6 +94,7 @@ model Conversation {
   messages Message[]
   leads    Lead[]
   appointments Appointment[]
+  tickets  Ticket[]
 
   @@map("conversations")
 }
@@ -152,6 +156,53 @@ model Appointment {
   @@index([conversationId])
   @@index([leadId])
   @@map("appointments")
+}
+
+model Ticket {
+  id             String   @id @default(cuid())
+  companyId      String   @map("company_id")
+  conversationId String?  @map("conversation_id")
+  ticketNumber   String   @map("ticket_number")
+  subject        String
+  description    String?
+  status         String   @default("open")
+  priority       String   @default("medium")
+  assignedTo     String?  @map("assigned_to")
+  customerName   String?  @map("customer_name")
+  customerEmail  String?  @map("customer_email")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  conversation Conversation? @relation(fields: [conversationId], references: [id])
+
+  @@unique([companyId, ticketNumber])
+  @@index([companyId])
+  @@index([conversationId])
+  @@map("tickets")
+}
+
+model Order {
+  id             String   @id @default(cuid())
+  companyId      String   @map("company_id")
+  orderNumber    String   @map("order_number")
+  customerName   String?  @map("customer_name")
+  customerEmail  String?  @map("customer_email")
+  items          Json     @default("[]")
+  status         String   @default("processing")
+  total          Float    @default(0)
+  currency       String   @default("USD")
+  shippingAddress String? @map("shipping_address")
+  trackingNumber String?  @map("tracking_number")
+  notes          String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, orderNumber])
+  @@index([companyId])
+  @@map("orders")
 }
 
 model Department {

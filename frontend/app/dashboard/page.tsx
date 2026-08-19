@@ -2,64 +2,73 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 
-interface Stats {
-  totalConversations: number;
-  activeConversations: number;
-  totalLeads: number;
-  newLeads: number;
-  totalAppointments: number;
-  pendingAppointments: number;
-  totalDocuments: number;
-}
-
-const EmptyStats: Stats = {
-  totalConversations: 0,
-  activeConversations: 0,
-  totalLeads: 0,
-  newLeads: 0,
-  totalAppointments: 0,
-  pendingAppointments: 0,
-  totalDocuments: 0,
-};
-
-export default function Dashboard() {
-  const [stats, setStats] = useState<Stats>(EmptyStats);
+export default function DashboardPage() {
+  const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
 
   useEffect(() => {
-    apiFetch<Stats>("/analytics/dashboard")
-      .then(setStats)
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
+    Promise.all([
+      apiFetch("/analytics/dashboard").catch(() => null),
+      apiFetch("/tickets/counts").catch(() => null),
+      apiFetch("/orders/counts").catch(() => null),
+    ]).then(([analytics, tickets, orders]) => {
+      setStats({ ...analytics, tickets, orders });
+      setLoading(false);
+    }).catch(() => setLoading(false));
   }, []);
 
+  if (loading) return <div className="py-12 text-center text-slate-400">Loading dashboard...</div>;
+
   const cards = [
-    { label: "Total Conversations", value: stats.totalConversations, color: "border-blue-500/40" },
-    { label: "Active Conversations", value: stats.activeConversations, color: "border-cyan-500/40" },
-    { label: "Total Leads", value: stats.totalLeads, color: "border-green-500/40" },
-    { label: "New Leads", value: stats.newLeads, color: "border-emerald-500/40" },
-    { label: "Total Appointments", value: stats.totalAppointments, color: "border-purple-500/40" },
-    { label: "Pending Appointments", value: stats.pendingAppointments, color: "border-orange-500/40" },
-    { label: "Knowledge Docs", value: stats.totalDocuments, color: "border-slate-500/40" },
+    { label: "Conversations", value: stats?.conversations?.total ?? stats?.conversations ?? 0, icon: "💬", color: "from-blue-500/20 to-blue-600/5 border-blue-500/20" },
+    { label: "Tickets", value: stats?.tickets?.total ?? 0, sub: `${stats?.tickets?.open ?? 0} open`, icon: "🎫", color: "from-yellow-500/20 to-yellow-600/5 border-yellow-500/20" },
+    { label: "Orders", value: stats?.orders?.total ?? 0, sub: `${stats?.orders?.processing ?? 0} processing`, icon: "📦", color: "from-green-500/20 to-green-600/5 border-green-500/20" },
+    { label: "Leads", value: stats?.leads?.total ?? stats?.leads ?? 0, icon: "📋", color: "from-purple-500/20 to-purple-600/5 border-purple-500/20" },
+    { label: "Appointments", value: stats?.appointments?.total ?? stats?.appointments ?? 0, icon: "📅", color: "from-pink-500/20 to-pink-600/5 border-pink-500/20" },
+    { label: "Knowledge Base", value: stats?.documents?.total ?? stats?.documents ?? 0, sub: "docs", icon: "📚", color: "from-cyan-500/20 to-cyan-600/5 border-cyan-500/20" },
   ];
 
   return (
-    <div>
-      <h1 className="mb-8 text-2xl font-bold">Dashboard</h1>
-      {error && <div className="mb-6 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">{error}</div>}
-      {loading ? (
-        <div className="text-slate-400">Loading analytics...</div>
-      ) : (
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {cards.map((c) => (
-            <div key={c.label} className={`rounded-xl border ${c.color} bg-[#111827] p-6`}>
-              <div className="text-3xl font-bold">{c.value}</div>
-              <div className="mt-2 text-sm text-slate-400">{c.label}</div>
+    <div className="space-y-6">
+      <h2 className="text-xl font-bold">Overview</h2>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-3">
+        {cards.map((c) => (
+          <div key={c.label} className={`rounded-xl border bg-gradient-to-br p-4 ${c.color}`}>
+            <div className="mb-3 flex items-center justify-between">
+              <span className="text-2xl">{c.icon}</span>
             </div>
-          ))}
+            <p className="text-2xl font-bold">{c.value}</p>
+            <p className="text-sm text-slate-400">{c.label}{c.sub ? ` · ${c.sub}` : ""}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="rounded-xl border border-slate-800 bg-[#111827] p-6">
+        <h3 className="mb-4 text-lg font-semibold">Widget Setup</h3>
+        <p className="mb-3 text-sm text-slate-400">Add this to your website to embed the AI chat widget:</p>
+        <code className="block rounded-lg bg-slate-800/50 p-3 text-xs text-green-400 overflow-x-auto">
+          {`<script src="https://ai-customer-support-backend-ldbf.onrender.com/widget.js"></script>`}
+        </code>
+        <p className="mt-2 text-xs text-slate-500">Optionally configure: <code className="text-slate-400">window.AI_SUPPORT_CONFIG = {"{'}"} companyId: "your-id" {"}"};</code></p>
+      </div>
+
+      <div className="rounded-xl border border-slate-800 bg-[#111827] p-6">
+        <h3 className="mb-4 text-lg font-semibold">Quick Actions</h3>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <a href="/dashboard/conversations" className="rounded-lg border border-slate-700 bg-slate-800/30 p-4 text-center text-sm transition-colors hover:border-blue-500/50 hover:bg-blue-500/5">
+            💬 View Conversations
+          </a>
+          <a href="/dashboard/tickets" className="rounded-lg border border-slate-700 bg-slate-800/30 p-4 text-center text-sm transition-colors hover:border-yellow-500/50 hover:bg-yellow-500/5">
+            🎫 Manage Tickets
+          </a>
+          <a href="/dashboard/knowledge-base" className="rounded-lg border border-slate-700 bg-slate-800/30 p-4 text-center text-sm transition-colors hover:border-cyan-500/50 hover:bg-cyan-500/5">
+            📚 Knowledge Base
+          </a>
+          <a href="/dashboard/settings" className="rounded-lg border border-slate-700 bg-slate-800/30 p-4 text-center text-sm transition-colors hover:border-slate-500/50 hover:bg-slate-500/5">
+            ⚙️ Settings
+          </a>
         </div>
-      )}
+      </div>
     </div>
   );
 }

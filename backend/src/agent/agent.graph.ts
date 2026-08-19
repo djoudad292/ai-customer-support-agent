@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
-import { StateGraph, Annotation, START, END } from '@langchain/langgraph';
+import { StateGraph, Annotation, START, END, MessagesAnnotation } from '@langchain/langgraph';
 import { PrismaService } from '../common/prisma.service';
 
 export const AgentState = Annotation.Root({
@@ -15,7 +15,11 @@ export const AgentState = Annotation.Root({
     reducer: (current, update) => ({ ...current, ...update }),
     default: () => ({}),
   }),
-  action: Annotation<{ type: string; data?: any } | null>({
+  pendingAction: Annotation<string | null>({
+    reducer: (current, update) => update ?? current,
+    default: () => null,
+  }),
+  pendingActionData: Annotation<Record<string, any> | null>({
     reducer: (current, update) => update ?? current,
     default: () => null,
   }),
@@ -41,178 +45,322 @@ export class AgentGraph {
       .addNode('decideAction', this.decideActionNode.bind(this))
       .addNode('captureLead', this.captureLeadNode.bind(this))
       .addNode('bookAppointment', this.bookAppointmentNode.bind(this))
+      .addNode('createTicket', this.createTicketNode.bind(this))
+      .addNode('lookupOrder', this.lookupOrderNode.bind(this))
+      .addNode('escalateToHuman', this.escalateNode.bind(this))
       .addNode('respond', this.respondNode.bind(this))
       .addEdge(START, 'understand')
       .addEdge('understand', 'retrieveKnowledge')
       .addEdge('retrieveKnowledge', 'decideAction')
       .addConditionalEdges('decideAction', (state) => {
-        if (state.action?.type === 'capture_lead') return 'captureLead';
-        if (state.action?.type === 'book_appointment') return 'bookAppointment';
+        if (state.pendingAction === 'capture_lead') return 'captureLead';
+        if (state.pendingAction === 'book_appointment') return 'bookAppointment';
+        if (state.pendingAction === 'create_ticket') return 'createTicket';
+        if (state.pendingAction === 'lookup_order') return 'lookupOrder';
+        if (state.pendingAction === 'escalate') return 'escalateToHuman';
         return 'respond';
       })
       .addEdge('captureLead', 'respond')
       .addEdge('bookAppointment', 'respond')
+      .addEdge('createTicket', 'respond')
+      .addEdge('lookupOrder', 'respond')
+      .addEdge('escalateToHuman', 'respond')
       .addEdge('respond', END);
 
     this.graph = finalGraph.compile();
-    this.logger.log('LangGraph agent compiled');
+    this.logger.log('LangGraph agent compiled with tools: lead, appointment, ticket, order, escalate');
   }
 
   private async understandNode(state: typeof AgentState.State) {
     const lastMessage = state.messages[state.messages.length - 1];
-    const llm = new ChatGoogleGenerativeAI({
-      apiKey: this.config.get<string>('GOOGLE_API_KEY'),
-      model: this.config.get<string>('LLM_MODEL', 'gemini-2.0-flash'),
-    });
-
-    const systemPrompt = `You are an AI customer support agent. You analyze the conversation and:
-1. Extract customer information (name, email, phone) if mentioned
-2. Determine intent: question, lead capture, appointment booking, or handoff
-
-Return JSON with keys: intent, name, email, phone.
-Only include name/email/phone if explicitly mentioned by the customer.`;
-
-    try {
-      const result = await llm.invoke([
-        { role: 'system', content: systemPrompt },
-        { role: 'human', content: lastMessage.content },
-      ]);
-
-      const text = result.content.toString().trim();
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : { intent: 'question' };
-
-      return {
-        customerInfo: {
-          name: parsed.name || state.customerInfo.name,
-          email: parsed.email || state.customerInfo.email,
-          phone: parsed.phone || state.customerInfo.phone,
-        },
-      };
-    } catch (error) {
-      this.logger.error(`Understand node failed: ${error}`);
-      return { customerInfo: state.customerInfo };
-    }
+    if (!lastMessage) return { messages: [] };
+    return {};
   }
 
   private async retrieveKnowledgeNode(state: typeof AgentState.State) {
     const lastMessage = state.messages[state.messages.length - 1];
-    const company = await this.prisma.company.findUnique({
-      where: { id: state.companyId },
-      include: { documents: { where: { published: true } } },
-    });
+    if (!lastMessage) return { messages: [] };
 
-    if (!company || company.documents.length === 0) {
-      return { response: '' };
+    try {
+      const chunks = await this.prisma.$queryRaw`
+        SELECT chunk_text, 1 - (embedding <=> '[0]'::vector) as similarity
+        FROM chunks
+        WHERE company_id = ${state.companyId}
+        ORDER BY embedding <=> (
+          SELECT COALESCE(
+            (SELECT embedding FROM chunks WHERE company_id = ${state.companyId} LIMIT 1),
+            '[0]'::vector
+          )
+        )
+        LIMIT 5
+      ` as any[];
+
+      if (chunks && chunks.length > 0) {
+        const context = chunks.map((c: any) => c.chunk_text).join('\n\n');
+        return {
+          messages: [{ role: 'system', content: `Knowledge base context:\n${context}` }],
+        };
+      }
+    } catch (error) {
+      this.logger.warn(`Knowledge retrieval failed: ${error}`);
     }
 
-    const llm = new ChatGoogleGenerativeAI({
-      apiKey: this.config.get<string>('GOOGLE_API_KEY'),
-      model: this.config.get<string>('LLM_MODEL', 'gemini-2.0-flash'),
-    });
-
-    const docs = company.documents.slice(0, 5);
-    const context = docs
-      .map((d) => `--- ${d.title} ---\n${d.content.slice(0, 2000)}`)
-      .join('\n\n');
-
-    const result = await llm.invoke([
-      {
-        role: 'system',
-        content: `You are a helpful customer support agent for ${company.name}. Use ONLY the provided knowledge base to answer. If the answer is not in the knowledge base, say you don't know and offer to connect with a human agent.\n\nKnowledge Base:\n${context}`,
-      },
-      { role: 'human', content: lastMessage.content },
-    ]);
-
-    return { response: result.content.toString() };
+    return {};
   }
 
   private async decideActionNode(state: typeof AgentState.State) {
     const lastMessage = state.messages[state.messages.length - 1];
-    const hasContactInfo = !!(state.customerInfo.name || state.customerInfo.email || state.customerInfo.phone);
+    if (!lastMessage) return { pendingAction: null };
 
-    const wantsAppointment = /book|schedule|appointment|meeting|reserve|calendar/.test(
-      lastMessage.content.toLowerCase(),
-    );
-    const isGreeting = /^(hi|hello|hey|good morning|good afternoon|good evening)/i.test(
-      lastMessage.content.trim(),
-    );
+    const llm = new ChatGoogleGenerativeAI({
+      apiKey: this.config.get<string>('GOOGLE_API_KEY'),
+      model: this.config.get<string>('LLM_MODEL', 'gemini-2.0-flash'),
+      maxOutputTokens: 1024,
+    });
 
-    if (hasContactInfo && wantsAppointment) {
-      return { action: { type: 'book_appointment', data: state.customerInfo } };
+    const conversationHistory = state.messages
+      .filter((m) => m.role !== 'system')
+      .slice(-10)
+      .map((m) => `${m.role}: ${m.content}`)
+      .join('\n');
+
+    const systemPrompt = `You are an AI customer support agent. Analyze the customer message and decide what action to take.
+
+Available actions (respond with EXACTLY the action identifier, nothing else):
+- none: Just answer the question normally
+- capture_lead: Customer wants to be contacted, is interested in products/services, or shares contact info
+- book_appointment: Customer wants to schedule a meeting or appointment
+- create_ticket: Customer has a problem, complaint, or issue that needs tracking
+- lookup_order: Customer asks about an order status, delivery, or shipment (extract the order number)
+- escalate: Customer is angry, frustrated, threatening, or the issue is too complex for AI
+
+Conversation history:
+${conversationHistory}
+
+Customer message: ${lastMessage.content}
+
+Respond with ONLY the action identifier (none, capture_lead, book_appointment, create_ticket, lookup_order, escalate):`;
+
+    try {
+      const result = await llm.invoke([
+        { role: 'user', content: systemPrompt },
+      ]);
+
+      const action = result.content.toString().trim().toLowerCase();
+      const validActions = ['capture_lead', 'book_appointment', 'create_ticket', 'lookup_order', 'escalate'];
+
+      if (validActions.includes(action)) {
+        const actionData: Record<string, any> = {};
+
+        if (action === 'lookup_order') {
+          const orderMatch = lastMessage.content.match(/(?:order|#)\s*(\w[\w-]*)/i);
+          if (orderMatch) actionData.orderNumber = orderMatch[1];
+        }
+
+        if (action === 'create_ticket') {
+          actionData.subject = lastMessage.content.slice(0, 200);
+          const urgentWords = ['urgent', 'asap', 'emergency', 'broken', 'critical'];
+          actionData.priority = urgentWords.some((w) => lastMessage.content.toLowerCase().includes(w)) ? 'high' : 'medium';
+        }
+
+        return { pendingAction: action, pendingActionData: actionData };
+      }
+
+      return { pendingAction: null };
+    } catch (error) {
+      this.logger.error(`Decide action failed: ${error}`);
+      return { pendingAction: null };
     }
-    if (hasContactInfo && !isGreeting) {
-      return { action: { type: 'capture_lead', data: state.customerInfo } };
-    }
-    return { action: null };
   }
 
   private async captureLeadNode(state: typeof AgentState.State) {
+    const lastMessage = state.messages[state.messages.length - 1];
+    const content = lastMessage?.content || '';
+
+    const emailMatch = content.match(/[\w.+-]+@[\w-]+\.[\w.-]+/);
+    const phoneMatch = content.match(/(?:\+\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/);
+    const namePatterns = content.match(/(?:my name is|i'm|i am)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/i);
+
+    const customerInfo: any = {};
+    if (emailMatch) customerInfo.email = emailMatch[0];
+    if (phoneMatch) customerInfo.phone = phoneMatch[0];
+    if (namePatterns) customerInfo.name = namePatterns[1];
+
+    const info = { ...state.customerInfo, ...customerInfo };
+
     try {
-      const lead = await this.prisma.lead.create({
+      await this.prisma.lead.create({
         data: {
           id: crypto.randomUUID(),
           companyId: state.companyId,
           conversationId: state.conversationId,
-          name: state.customerInfo.name || null,
-          email: state.customerInfo.email || null,
-          phone: state.customerInfo.phone || null,
-          message: state.messages.map((m) => m.content).join('\n'),
+          name: info.name,
+          email: info.email,
+          phone: info.phone,
+          message: content,
           source: 'chat',
           status: 'new',
         },
       });
-      this.logger.log(`Lead captured: ${lead.id}`);
     } catch (error) {
-      this.logger.error(`Lead capture failed: ${error}`);
+      this.logger.error(`Failed to capture lead: ${error}`);
     }
-    return {};
+
+    return { customerInfo: info, messages: [] };
   }
 
   private async bookAppointmentNode(state: typeof AgentState.State) {
+    const lastMessage = state.messages[state.messages.length - 1];
+    const content = lastMessage?.content || '';
+
+    const datePatterns = content.match(/(\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}|\w+\s+\d{1,2}(?:st|nd|rd|th)?(?:\s*,?\s*\d{4})?)/i);
+    let startTime = new Date();
+    if (datePatterns) {
+      const parsed = new Date(datePatterns[1]);
+      if (!isNaN(parsed.getTime())) startTime = parsed;
+    } else {
+      startTime.setDate(startTime.getDate() + 1);
+      startTime.setHours(10, 0, 0, 0);
+    }
+
+    const endTime = new Date(startTime);
+    endTime.setHours(endTime.getHours() + 1);
+
     try {
-      const appointment = await this.prisma.appointment.create({
+      await this.prisma.appointment.create({
         data: {
           id: crypto.randomUUID(),
           companyId: state.companyId,
           conversationId: state.conversationId,
-          customerName: state.customerInfo.name || null,
-          customerEmail: state.customerInfo.email || null,
+          customerName: state.customerInfo?.name,
+          customerEmail: state.customerInfo?.email,
           title: 'Customer Appointment',
-          notes: state.messages.map((m) => m.content).join('\n'),
-          startTime: new Date(Date.now() + 24 * 60 * 60 * 1000),
-          endTime: new Date(Date.now() + 25 * 60 * 60 * 1000),
+          notes: content.slice(0, 500),
+          startTime,
+          endTime,
           status: 'requested',
         },
       });
-      this.logger.log(`Appointment booked: ${appointment.id}`);
     } catch (error) {
-      this.logger.error(`Appointment booking failed: ${error}`);
+      this.logger.error(`Failed to book appointment: ${error}`);
     }
-    return {};
+
+    return { messages: [] };
+  }
+
+  private async createTicketNode(state: typeof AgentState.State) {
+    const lastMessage = state.messages[state.messages.length - 1];
+    const content = lastMessage?.content || '';
+    const actionData = state.pendingActionData || {};
+
+    try {
+      const count = await this.prisma.ticket.count({ where: { companyId: state.companyId } });
+      const ticket = await this.prisma.ticket.create({
+        data: {
+          id: crypto.randomUUID(),
+          companyId: state.companyId,
+          conversationId: state.conversationId,
+          ticketNumber: `TKT-${String(count + 1).padStart(4, '0')}`,
+          subject: actionData.subject || content.slice(0, 200),
+          description: content,
+          priority: actionData.priority || 'medium',
+          status: 'open',
+          customerName: state.customerInfo?.name,
+          customerEmail: state.customerInfo?.email,
+        },
+      });
+      this.logger.log(`Created ticket ${ticket.ticketNumber} for conversation ${state.conversationId}`);
+    } catch (error) {
+      this.logger.error(`Failed to create ticket: ${error}`);
+    }
+
+    return { messages: [] };
+  }
+
+  private async lookupOrderNode(state: typeof AgentState.State) {
+    const actionData = state.pendingActionData || {};
+    const orderNumber = actionData.orderNumber;
+
+    if (orderNumber) {
+      try {
+        const order = await this.prisma.order.findFirst({
+          where: { companyId: state.companyId, orderNumber },
+        });
+
+        if (order) {
+          return {
+            messages: [{
+              role: 'system',
+              content: `Order ${order.orderNumber} details: Status=${order.status}, Total=${order.total} ${order.currency}${order.trackingNumber ? `, Tracking=${order.trackingNumber}` : ''}`,
+            }],
+          };
+        } else {
+          return {
+            messages: [{
+              role: 'system',
+              content: `Order ${orderNumber} was not found. Ask the customer to verify the order number.`,
+            }],
+          };
+        }
+      } catch (error) {
+        this.logger.error(`Order lookup failed: ${error}`);
+      }
+    }
+
+    return {
+      messages: [{
+        role: 'system',
+        content: 'Could not find an order number in the message. Ask the customer for their order number.',
+      }],
+    };
+  }
+
+  private async escalateNode(state: typeof AgentState.State) {
+    try {
+      await this.prisma.conversation.update({
+        where: { id: state.conversationId },
+        data: {
+          status: 'escalated',
+          escalatedAt: new Date(),
+        },
+      });
+      this.logger.log(`Conversation ${state.conversationId} escalated to human agent`);
+    } catch (error) {
+      this.logger.error(`Escalation failed: ${error}`);
+    }
+
+    return { messages: [] };
   }
 
   private async respondNode(state: typeof AgentState.State) {
-    const lastMessage = state.messages[state.messages.length - 1];
     const llm = new ChatGoogleGenerativeAI({
       apiKey: this.config.get<string>('GOOGLE_API_KEY'),
       model: this.config.get<string>('LLM_MODEL', 'gemini-2.0-flash'),
+      maxOutputTokens: 2048,
     });
 
     let actionNote = '';
-    if (state.action?.type === 'capture_lead') {
-      actionNote = "\n\nGreat news! I've captured your information and a team member will reach out to you shortly. Is there anything else I can help you with?";
-    } else if (state.action?.type === 'book_appointment') {
-      actionNote = "\n\nWonderful! I've scheduled an appointment for you. A team member will confirm the details via email. Is there anything else I can help you with?";
+    if (state.pendingAction === 'capture_lead') {
+      actionNote = "\n\nI've noted your contact details — a team member will reach out shortly. Is there anything else I can help with?";
+    } else if (state.pendingAction === 'book_appointment') {
+      actionNote = "\n\nI've scheduled that appointment for you. A confirmation will be sent to your email. Anything else?";
+    } else if (state.pendingAction === 'create_ticket') {
+      actionNote = "\n\nI've created a support ticket for your issue. Our team will follow up with you. Is there anything else?";
+    } else if (state.pendingAction === 'escalate') {
+      actionNote = "\n\nI'm connecting you with a human agent who can better assist you. Please hold on.";
     }
 
-    const systemPrompt = `You are a friendly and professional AI customer support agent. Answer the customer's question. Keep responses concise and helpful.${actionNote}`;
+    const conversationHistory = state.messages
+      .slice(-20)
+      .map((m) => ({ role: m.role as 'user' | 'assistant' | 'system', content: m.content }));
+
+    const systemPrompt = {
+      role: 'system' as const,
+      content: `You are a friendly and professional AI customer support agent. Answer the customer's question based on the knowledge base context if available. Keep responses concise and helpful. Be warm and conversational.${actionNote}`,
+    };
 
     try {
-      const result = await llm.invoke([
-        { role: 'system', content: systemPrompt },
-        { role: 'human', content: lastMessage.content },
-      ]);
+      const result = await llm.invoke([systemPrompt, ...conversationHistory]);
       return { response: result.content.toString() };
     } catch (error) {
       this.logger.error(`Respond node failed: ${error}`);
@@ -224,15 +372,23 @@ Only include name/email/phone if explicitly mentioned by the customer.`;
     messages: { role: string; content: string }[];
     companyId: string;
     conversationId: string;
+    customerInfo?: { name?: string; email?: string; phone?: string };
   }) {
     const result = await this.graph.invoke({
       messages: input.messages,
       companyId: input.companyId,
       conversationId: input.conversationId,
-      customerInfo: {},
-      action: null,
+      customerInfo: input.customerInfo || {},
+      pendingAction: null,
+      pendingActionData: null,
       response: '',
     });
-    return result;
+
+    return {
+      response: result.response,
+      pendingAction: result.pendingAction,
+      pendingActionData: result.pendingActionData,
+      customerInfo: result.customerInfo,
+    };
   }
 }
