@@ -1,0 +1,29 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #0a0f1a;
+  --card: #111827;
+  --border: #1e293b;
+  --primary: #3b82f6;
+  --primary-foreground: #ffffff;
+  --foreground: #f8fafc;
+  --muted: #94a3b8;
+  --muted-bg: #1e293b;
+}
+
+body {
+  background: var(--bg);
+  color: var(--foreground);
+}
+
+input, textarea, select {
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--foreground);
+}
+
+input::placeholder, textarea::placeholder {
+  color: var(--muted);
+}

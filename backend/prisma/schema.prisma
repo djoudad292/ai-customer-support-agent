@@ -1,0 +1,169 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  name         String
+  role         String   @default("admin")
+  companyId    String   @map("company_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("users")
+}
+
+model Company {
+  id        String   @id
+  name      String
+  slug      String   @unique
+  plan      String   @default("free")
+  settings  Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  users         User[]
+  documents     Document[]
+  conversations Conversation[]
+  leads         Lead[]
+  appointments  Appointment[]
+  departments   Department[]
+
+  @@map("companies")
+}
+
+model Document {
+  id          String   @id @default(cuid())
+  companyId   String   @map("company_id")
+  title       String
+  content     String
+  filename    String?
+  mime        String?
+  sizeBytes   Int      @default(0) @map("size_bytes")
+  pageCount   Int      @default(0) @map("page_count")
+  status      String   @default("ready")
+  published   Boolean  @default(false)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  chunks  Chunk[]
+
+  @@map("documents")
+}
+
+model Chunk {
+  id           String   @id @default(cuid())
+  documentId   String   @map("document_id")
+  companyId    String   @map("company_id")
+  chunkIndex   Int      @map("chunk_index")
+  chunkText    String   @map("chunk_text")
+  embedding    Unsupported("vector(1536)")?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([documentId])
+  @@map("chunks")
+}
+
+model Conversation {
+  id          String   @id @default(cuid())
+  companyId   String   @map("company_id")
+  title       String?
+  status      String   @default("active")
+  department  String?
+  handledBy   String?  @map("handled_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  company  Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  messages Message[]
+  leads    Lead[]
+  appointments Appointment[]
+
+  @@map("conversations")
+}
+
+model Message {
+  id              String   @id @default(cuid())
+  conversationId  String   @map("conversation_id")
+  senderType      String   @map("sender_type")
+  senderId        String?  @map("sender_id")
+  content         String
+  metadata        Json?
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@map("messages")
+}
+
+model Lead {
+  id             String   @id @default(cuid())
+  companyId      String   @map("company_id")
+  conversationId String?  @map("conversation_id")
+  name           String?
+  email          String?
+  phone          String?
+  message        String?
+  source         String   @default("chat")
+  status         String   @default("new")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  conversation Conversation? @relation(fields: [conversationId], references: [id])
+
+  @@index([companyId])
+  @@index([conversationId])
+  @@map("leads")
+}
+
+model Appointment {
+  id             String   @id @default(cuid())
+  companyId      String   @map("company_id")
+  conversationId String?  @map("conversation_id")
+  leadId         String?  @map("lead_id")
+  customerName   String?  @map("customer_name")
+  customerEmail  String?  @map("customer_email")
+  title          String
+  notes          String?
+  startTime      DateTime @map("start_time")
+  endTime        DateTime @map("end_time")
+  status         String   @default("requested")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  conversation Conversation? @relation(fields: [conversationId], references: [id])
+
+  @@index([companyId])
+  @@index([conversationId])
+  @@index([leadId])
+  @@map("appointments")
+}
+
+model Department {
+  id          String   @id @default(cuid())
+  companyId   String   @map("company_id")
+  name        String
+  description String?
+  keywords    Json     @default("[]")
+  email       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("departments")
+}
