@@ -29,6 +29,6 @@ jobs:
           npm run build
 
       - name: Deploy to Netlify
-        run: npx --yes netlify-cli@27.1.0 deploy --prod --dir frontend/out --site ${{ secrets.NETLIFY_SITE_ID }}
+        run: npx --yes netlify-cli@27.1.0 deploy --prod --dir frontend/out --site 1dff2b0d-844e-4678-b1b5-61b8d6921b34
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
