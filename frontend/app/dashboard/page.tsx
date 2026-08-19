@@ -55,6 +55,9 @@ export default function DashboardPage() {
       <div className="rounded-xl border border-slate-800 bg-[#111827] p-6">
         <h3 className="mb-4 text-lg font-semibold">Quick Actions</h3>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <a href="/dashboard/graph-inspector" className="rounded-lg border border-slate-700 bg-slate-800/30 p-4 text-center text-sm transition-colors hover:border-blue-500/50 hover:bg-blue-500/5">
+            🕸️ Graph Inspector
+          </a>
           <a href="/dashboard/conversations" className="rounded-lg border border-slate-700 bg-slate-800/30 p-4 text-center text-sm transition-colors hover:border-blue-500/50 hover:bg-blue-500/5">
             💬 View Conversations
           </a>
