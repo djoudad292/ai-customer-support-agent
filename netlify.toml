@@ -4,4 +4,4 @@
   publish = "out"
 
 [build.environment]
-  NEXT_PUBLIC_API_URL = "https://ai-customer-support-backend.onrender.com"
+  NEXT_PUBLIC_API_URL = "https://ai-customer-support-backend-ldbf.onrender.com"

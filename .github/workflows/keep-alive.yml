@@ -11,5 +11,4 @@ jobs:
     steps:
       - name: Ping health endpoint
         run: |
-          curl -fsS -o /dev/null -w "health %{http_code}\n" \
-            https://ai-customer-support-backend.onrender.com/health || echo "health ping failed"
+          curl -fsS -o /dev/null -w "health %{http_code}\n"             https://ai-customer-support-backend-ldbf.onrender.com/health || echo "health ping failed"
