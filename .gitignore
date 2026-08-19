@@ -16,3 +16,4 @@ Thumbs.db
 mobile/node_modules/
 mobile/dist/
 mobile/.expo/
+.netlify/
