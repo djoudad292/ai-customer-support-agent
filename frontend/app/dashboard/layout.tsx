@@ -3,15 +3,17 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { LayoutDashboard, MessageSquare, Ticket, Package, BookOpen, ClipboardList, CalendarDays, Settings } from "lucide-react";
+
 const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: "📊" },
-  { href: "/dashboard/conversations", label: "Conversations", icon: "💬" },
-  { href: "/dashboard/tickets", label: "Tickets", icon: "🎫" },
-  { href: "/dashboard/orders", label: "Orders", icon: "📦" },
-  { href: "/dashboard/knowledge-base", label: "Knowledge Base", icon: "📚" },
-  { href: "/dashboard/leads", label: "Leads", icon: "📋" },
-  { href: "/dashboard/appointments", label: "Appointments", icon: "📅" },
-  { href: "/dashboard/settings", label: "Settings", icon: "⚙️" },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/dashboard/conversations", label: "Conversations", icon: MessageSquare },
+  { href: "/dashboard/tickets", label: "Tickets", icon: Ticket },
+  { href: "/dashboard/orders", label: "Orders", icon: Package },
+  { href: "/dashboard/knowledge-base", label: "Knowledge Base", icon: BookOpen },
+  { href: "/dashboard/leads", label: "Leads", icon: ClipboardList },
+  { href: "/dashboard/appointments", label: "Appointments", icon: CalendarDays },
+  { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -47,10 +49,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       <aside className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-slate-800 bg-[#0d1424] transition-transform duration-200 lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="flex items-center gap-2 border-b border-slate-800 px-5 py-4">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-indigo-500 text-sm">💬</div>
-          <span className="font-semibold">AI Support</span>
-          <button onClick={() => setSidebarOpen(false)} className="ml-auto p-1 text-slate-400 hover:text-white lg:hidden">✕</button>
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white">
+            <MessageSquare className="h-5 w-5" />
+          </div>
+          <span className="font-semibold text-slate-100">AI Support</span>
         </div>
+
         <nav className="flex-1 space-y-1 px-3 py-4">
           {navItems.map((item) => {
             const isActive = currentPath === item.href || (item.href !== "/dashboard" && currentPath.startsWith(item.href));
@@ -58,10 +62,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <Link
                 key={item.href}
                 href={item.href}
-                onClick={() => setCurrentPath(item.href)}
-                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${isActive ? "bg-blue-500/10 text-blue-400" : "text-slate-400 hover:bg-slate-800/50 hover:text-slate-200"}`}
+                onClick={() => { setCurrentPath(item.href); setSidebarOpen(false); }}
+                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${isActive ? "bg-blue-600 text-white" : "text-slate-400 hover:bg-slate-800 hover:text-slate-200"}`}
               >
-                <span className="text-lg">{item.icon}</span>
+                <item.icon className="h-4 w-4" />
                 {item.label}
               </Link>
             );
