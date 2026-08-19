@@ -31,11 +31,8 @@ export class AgentGraph {
   private logger = new Logger(AgentGraph.name);
   private graph: any;
 
-  constructor(
-    private config: ConfigService,
-    private prisma: PrismaService,
-  ) {
-    this.buildGraph();
+  getCompiledGraph() {
+    return this.graph;
   }
 
   private buildGraph() {
