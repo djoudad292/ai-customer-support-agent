@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: ai-customer-support-backend
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm ci && npm run build
+    startCommand: node dist/main
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: DATABASE_URL
+        sync: false
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_REFRESH_SECRET
+        sync: false
+      - key: APP_URL
+        value: https://ai-customer-support-backend-ldbf.onrender.com
