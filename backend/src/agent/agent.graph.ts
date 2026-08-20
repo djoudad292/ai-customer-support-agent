@@ -25,6 +25,14 @@ export const AgentState = Annotation.Root({
     reducer: (current, update) => update ?? current,
     default: () => null,
   }),
+  actionSummary: Annotation<string>({
+    reducer: (current, update) => update || current,
+    default: () => '',
+  }),
+  sentiment: Annotation<string>({
+    reducer: (current, update) => update || current,
+    default: () => 'neutral',
+  }),
   response: Annotation<string>(),
 });
 
@@ -80,7 +88,21 @@ export class AgentGraph {
   private async understandNode(state: typeof AgentState.State) {
     const lastMessage = state.messages[state.messages.length - 1];
     if (!lastMessage) return { messages: [] };
-    return {};
+
+    const content = lastMessage.content.toLowerCase().trim();
+
+    let sentiment = state.sentiment;
+    if (/\b(angry|furious|hate|terrible|awful|worst|unacceptable|ridiculous|disgusting)\b/.test(content)) {
+      sentiment = 'negative';
+    } else if (/\b(happy|great|awesome|love|excellent|amazing|wonderful|fantastic|thanks|thank you)\b/.test(content)) {
+      sentiment = 'positive';
+    } else if (/\b(hi|hello|hey|good morning|good afternoon|good evening|what's up)\b/.test(content)) {
+      sentiment = 'greeting';
+    } else if (/\b(bye|goodbye|see you|thanks bye|that's all|nothing else)\b/.test(content)) {
+      sentiment = 'farewell';
+    }
+
+    return { sentiment };
   }
 
   private async retrieveKnowledgeNode(state: typeof AgentState.State) {
@@ -121,7 +143,7 @@ export class AgentGraph {
     const llm = new ChatOpenAI({
       apiKey: OR_KEY,
       modelName: this.config.get<string>('LLM_MODEL', 'meta-llama/llama-3.1-8b-instruct'),
-      maxTokens: 1024,
+      maxTokens: 256,
       temperature: 0,
       configuration: {
         baseURL: 'https://openrouter.ai/api/v1',
@@ -134,29 +156,32 @@ export class AgentGraph {
       .map((m) => `${m.role}: ${m.content}`)
       .join('\n');
 
-    const systemPrompt = `You are an AI customer support agent. Analyze the customer message and decide what action to take.
+    const customerContext = state.customerInfo?.name ? `Customer name: ${state.customerInfo.name}` : '';
 
-Available actions (respond with EXACTLY the action identifier, nothing else):
-- none: Just answer the question normally
-- capture_lead: Customer wants to be contacted, is interested in products/services, or shares contact info
-- book_appointment: Customer wants to schedule a meeting or appointment
-- create_ticket: Customer has a problem, complaint, or issue that needs tracking
-- lookup_order: Customer asks about an order status, delivery, or shipment (extract the order number)
-- escalate: Customer is angry, frustrated, threatening, or the issue is too complex for AI
+    const systemPrompt = `You are an AI support agent router. Analyze the customer message and decide the action.
 
+Available actions (respond with EXACTLY the action identifier):
+- none: Simple question, greeting, small talk, thank you, or farewell
+- capture_lead: Customer wants to be contacted, shares email/phone, or shows interest in products/services
+- book_appointment: Customer wants to schedule a meeting, appointment, consultation, or call
+- create_ticket: Customer has a problem, bug, complaint, issue, or damage report
+- lookup_order: Customer asks about order status, delivery, tracking, or shipment
+- escalate: Customer is very angry, threatening, or the issue requires human intervention
+
+${customerContext}
 Conversation history:
 ${conversationHistory}
 
-Customer message: ${lastMessage.content}
+Customer: ${lastMessage.content}
 
-Respond with ONLY the action identifier (none, capture_lead, book_appointment, create_ticket, lookup_order, escalate):`;
+Reply with ONLY the action identifier (none, capture_lead, book_appointment, create_ticket, lookup_order, escalate):`;
 
     try {
       const result = await llm.invoke([
         { role: 'user', content: systemPrompt },
       ]);
 
-      const action = result.content.toString().trim().toLowerCase();
+      const action = result.content.toString().trim().toLowerCase().replace(/[^a-z_]/g, '');
       const validActions = ['capture_lead', 'book_appointment', 'create_ticket', 'lookup_order', 'escalate'];
 
       if (validActions.includes(action)) {
@@ -169,8 +194,13 @@ Respond with ONLY the action identifier (none, capture_lead, book_appointment, c
 
         if (action === 'create_ticket') {
           actionData.subject = lastMessage.content.slice(0, 200);
-          const urgentWords = ['urgent', 'asap', 'emergency', 'broken', 'critical'];
+          const urgentWords = ['urgent', 'asap', 'emergency', 'broken', 'critical', 'crashed', 'down', 'outage', 'security', 'data loss'];
           actionData.priority = urgentWords.some((w) => lastMessage.content.toLowerCase().includes(w)) ? 'high' : 'medium';
+          actionData.category = this.detectCategory(lastMessage.content);
+        }
+
+        if (action === 'book_appointment') {
+          actionData.preferredTime = lastMessage.content.slice(0, 200);
         }
 
         return { pendingAction: action, pendingActionData: actionData };
@@ -179,33 +209,43 @@ Respond with ONLY the action identifier (none, capture_lead, book_appointment, c
       return { pendingAction: null };
     } catch (error) {
       this.logger.error(`Decide action failed: ${error}`);
-      // Keyword-based fallback for demo when LLM has no credits
       const content = lastMessage.content.toLowerCase();
       const actionData: Record<string, any> = {};
 
-      if (content.includes('order') || content.includes('#')) {
+      if (content.match(/\b(order|#)\s*\w/)) {
         const orderMatch = content.match(/(?:order|#)\s*(\w[\w-]*)/i);
         if (orderMatch) actionData.orderNumber = orderMatch[1];
         return { pendingAction: 'lookup_order', pendingActionData: actionData };
       }
-      if (content.includes('ticket') || content.includes('issue') || content.includes('problem') || content.includes('broken') || content.includes('complaint')) {
+      if (content.match(/\b(ticket|issue|problem|broken|complaint|bug|crash|error|not working|damaged)\b/)) {
         actionData.subject = lastMessage.content.slice(0, 200);
-        const urgentWords = ['urgent', 'asap', 'emergency', 'broken', 'critical'];
+        const urgentWords = ['urgent', 'asap', 'emergency', 'broken', 'critical', 'crashed', 'down'];
         actionData.priority = urgentWords.some((w) => content.includes(w)) ? 'high' : 'medium';
+        actionData.category = this.detectCategory(lastMessage.content);
         return { pendingAction: 'create_ticket', pendingActionData: actionData };
       }
-      if (content.includes('email') || content.includes('contact') || content.includes('call me') || content.includes('reach out')) {
+      if (content.match(/\b(email|contact|call me|reach out|phone|get back)\b/)) {
         return { pendingAction: 'capture_lead', pendingActionData: actionData };
       }
-      if (content.includes('appointment') || content.includes('meeting') || content.includes('schedule') || content.includes('book')) {
+      if (content.match(/\b(appointment|meeting|schedule|book|consultation|call)\b/)) {
         return { pendingAction: 'book_appointment', pendingActionData: actionData };
       }
-      if (content.includes('angry') || content.includes('frustrated') || content.includes('terrible') || content.includes('awful') || content.includes('hate')) {
+      if (content.match(/\b(angry|furious|hate|terrible|awful|worst|unacceptable|ridiculous)\b/)) {
         return { pendingAction: 'escalate', pendingActionData: actionData };
       }
 
       return { pendingAction: null };
     }
+  }
+
+  private detectCategory(content: string): string {
+    const lower = content.toLowerCase();
+    if (lower.match(/\b(billing|payment|charge|refund|invoice|price|cost)\b/)) return 'billing';
+    if (lower.match(/\b(delivery|shipping|tracking|package|arrived|late)\b/)) return 'shipping';
+    if (lower.match(/\b(login|password|account|access|locked|sign in)\b/)) return 'account';
+    if (lower.match(/\b(bug|crash|error|glitch|broken|not working|500|404)\b/)) return 'technical';
+    if (lower.match(/\b(product|quality|defective|damage|return|exchange)\b/)) return 'product';
+    return 'general';
   }
 
   private async captureLeadNode(state: typeof AgentState.State) {
@@ -223,8 +263,14 @@ Respond with ONLY the action identifier (none, capture_lead, book_appointment, c
 
     const info = { ...state.customerInfo, ...customerInfo };
 
+    const capturedParts: string[] = [];
+    if (info.name) capturedParts.push(`Name: ${info.name}`);
+    if (info.email) capturedParts.push(`Email: ${info.email}`);
+    if (info.phone) capturedParts.push(`Phone: ${info.phone}`);
+
+    let leadId = '';
     try {
-      await this.prisma.lead.create({
+      const lead = await this.prisma.lead.create({
         data: {
           id: crypto.randomUUID(),
           companyId: state.companyId,
@@ -237,11 +283,16 @@ Respond with ONLY the action identifier (none, capture_lead, book_appointment, c
           status: 'new',
         },
       });
+      leadId = lead.id.slice(0, 8).toUpperCase();
     } catch (error) {
       this.logger.error(`Failed to capture lead: ${error}`);
     }
 
-    return { customerInfo: info, messages: [] };
+    const summary = capturedParts.length > 0
+      ? `Lead captured (${leadId}): ${capturedParts.join(', ')}. A team member will reach out within 24 hours.`
+      : `Lead captured (${leadId}): Contact request recorded. Our team will reach out soon.`;
+
+    return { customerInfo: info, actionSummary: summary, messages: [] };
   }
 
   private async bookAppointmentNode(state: typeof AgentState.State) {
@@ -261,8 +312,16 @@ Respond with ONLY the action identifier (none, capture_lead, book_appointment, c
     const endTime = new Date(startTime);
     endTime.setHours(endTime.getHours() + 1);
 
+    const options: Intl.DateTimeFormatOptions = {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    };
+    const formattedDate = startTime.toLocaleDateString('en-US', options);
+    const formattedEnd = endTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+    let apptId = '';
     try {
-      await this.prisma.appointment.create({
+      const appt = await this.prisma.appointment.create({
         data: {
           id: crypto.randomUUID(),
           companyId: state.companyId,
@@ -276,11 +335,13 @@ Respond with ONLY the action identifier (none, capture_lead, book_appointment, c
           status: 'requested',
         },
       });
+      apptId = appt.id.slice(0, 8).toUpperCase();
     } catch (error) {
       this.logger.error(`Failed to book appointment: ${error}`);
     }
 
-    return { messages: [] };
+    const summary = `Appointment booked (${apptId}): ${formattedDate} to ${formattedEnd}. A calendar invite will be sent to ${state.customerInfo?.email || 'your email'}.`;
+    return { actionSummary: summary, messages: [] };
   }
 
   private async createTicketNode(state: typeof AgentState.State) {
@@ -288,6 +349,10 @@ Respond with ONLY the action identifier (none, capture_lead, book_appointment, c
     const content = lastMessage?.content || '';
     const actionData = state.pendingActionData || {};
 
+    const priorityLabel = actionData.priority === 'high' ? 'HIGH' : 'MEDIUM';
+    const category = actionData.category || 'general';
+
+    let ticketNumber = '';
     try {
       const count = await this.prisma.ticket.count({ where: { companyId: state.companyId } });
       const ticket = await this.prisma.ticket.create({
@@ -304,12 +369,14 @@ Respond with ONLY the action identifier (none, capture_lead, book_appointment, c
           customerEmail: state.customerInfo?.email,
         },
       });
-      this.logger.log(`Created ticket ${ticket.ticketNumber} for conversation ${state.conversationId}`);
+      ticketNumber = ticket.ticketNumber;
+      this.logger.log(`Created ticket ${ticketNumber} for conversation ${state.conversationId}`);
     } catch (error) {
       this.logger.error(`Failed to create ticket: ${error}`);
     }
 
-    return { messages: [] };
+    const summary = `Support ticket created: ${ticketNumber} | Priority: ${priorityLabel} | Category: ${category.charAt(0).toUpperCase() + category.slice(1)} | Status: Open`;
+    return { actionSummary: summary, messages: [] };
   }
 
   private async lookupOrderNode(state: typeof AgentState.State) {
@@ -323,17 +390,20 @@ Respond with ONLY the action identifier (none, capture_lead, book_appointment, c
         });
 
         if (order) {
+          const summary = `Order ${order.orderNumber}: Status: ${order.status} | Total: ${order.total} ${order.currency}${order.trackingNumber ? ` | Tracking: ${order.trackingNumber}` : ''}`;
           return {
+            actionSummary: summary,
             messages: [{
               role: 'system',
-              content: `Order ${order.orderNumber} details: Status=${order.status}, Total=${order.total} ${order.currency}${order.trackingNumber ? `, Tracking=${order.trackingNumber}` : ''}`,
+              content: `Order found. ${summary}. Craft a helpful response with this information.`,
             }],
           };
         } else {
           return {
+            actionSummary: `Order #${orderNumber} not found in our system`,
             messages: [{
               role: 'system',
-              content: `Order ${orderNumber} was not found. Ask the customer to verify the order number.`,
+              content: `Order ${orderNumber} was not found. Ask the customer to double-check the order number. Offer to help them find it using their email or phone.`,
             }],
           };
         }
@@ -343,9 +413,10 @@ Respond with ONLY the action identifier (none, capture_lead, book_appointment, c
     }
 
     return {
+      actionSummary: 'No order number provided',
       messages: [{
         role: 'system',
-        content: 'Could not find an order number in the message. Ask the customer for their order number.',
+        content: 'Could not find an order number in the message. Ask the customer for their order number. You can also offer to look it up using their email address.',
       }],
     };
   }
@@ -364,30 +435,33 @@ Respond with ONLY the action identifier (none, capture_lead, book_appointment, c
       this.logger.error(`Escalation failed: ${error}`);
     }
 
-    return { messages: [] };
+    return {
+      actionSummary: 'Conversation escalated to human agent. Priority queue assigned.',
+      messages: [{
+        role: 'system',
+        content: 'The customer is upset. Acknowledge their frustration sincerely, apologize, and let them know a human specialist is being connected. Do NOT be robotic or dismissive.',
+      }],
+    };
   }
 
   private async respondNode(state: typeof AgentState.State) {
     const llm = new ChatOpenAI({
       apiKey: OR_KEY,
       modelName: this.config.get<string>('LLM_MODEL', 'meta-llama/llama-3.1-8b-instruct'),
-      maxTokens: 2048,
+      maxTokens: 1024,
       temperature: 0.7,
       configuration: {
         baseURL: 'https://openrouter.ai/api/v1',
       },
     });
 
-    let actionNote = '';
-    if (state.pendingAction === 'capture_lead') {
-      actionNote = "\n\nI've noted your contact details — a team member will reach out shortly. Is there anything else I can help with?";
-    } else if (state.pendingAction === 'book_appointment') {
-      actionNote = "\n\nI've scheduled that appointment for you. A confirmation will be sent to your email. Anything else?";
-    } else if (state.pendingAction === 'create_ticket') {
-      actionNote = "\n\nI've created a support ticket for your issue. Our team will follow up with you. Is there anything else?";
-    } else if (state.pendingAction === 'escalate') {
-      actionNote = "\n\nI'm connecting you with a human agent who can better assist you. Please hold on.";
-    }
+    const actionContext = state.actionSummary ? `\n\nACTION TAKEN: ${state.actionSummary}` : '';
+    const customerName = state.customerInfo?.name ? ` (Customer name: ${state.customerInfo.name})` : '';
+    const sentimentNote = state.sentiment === 'negative'
+      ? '\nIMPORTANT: The customer is frustrated. Be extra empathetic, acknowledge their feelings, and reassure them.'
+      : state.sentiment === 'positive'
+      ? '\nThe customer is in a good mood. Match their energy and be warm.'
+      : '';
 
     const conversationHistory = state.messages
       .slice(-20)
@@ -395,7 +469,22 @@ Respond with ONLY the action identifier (none, capture_lead, book_appointment, c
 
     const systemPrompt = {
       role: 'system' as const,
-      content: `You are a friendly and professional AI customer support agent. Answer the customer's question based on the knowledge base context if available. Keep responses concise and helpful. Be warm and conversational.${actionNote}`,
+      content: `You are a warm, friendly, and professional AI customer support agent${customerName}. You are having a natural conversation.
+
+RULES:
+- Be conversational, not robotic. Vary your greetings and closings.
+- Keep responses concise (2-4 sentences max) unless explaining something complex.
+- If an ACTION TAKEN is noted, weave it naturally into your response with a confirmation.
+- End with a helpful follow-up question or offer when appropriate.
+- Never say "as an AI" or "I'm an AI assistant" - just be helpful.
+- Use the customer's name if you know it.
+- Match the customer's energy: casual for casual, professional for formal.
+${sentimentNote}${actionContext}
+
+Examples of good responses:
+- "Hi Sarah! I've just created ticket TKT-0001 for your laptop issue. Our tech team will reach out within 2 hours. In the meantime, have you tried restarting the device?"
+- "I found your order! It's currently in transit with tracking number TRK-123. Expected delivery is this Thursday. Want me to send you the tracking link?"
+- "I completely understand your frustration, and I'm sorry about this experience. I'm connecting you with a specialist right now who can resolve this for you."`,
     };
 
     try {
@@ -403,17 +492,22 @@ Respond with ONLY the action identifier (none, capture_lead, book_appointment, c
       return { response: result.content.toString() };
     } catch (error) {
       this.logger.error(`Respond node failed: ${error}`);
-      // Smart fallback for demo when LLM has no credits
-      const mockResponses: Record<string, string> = {
-        capture_lead: "Thanks for sharing your contact details! I've saved them as a lead. Our team will reach out within 24 hours. Is there anything else I can help with?",
-        book_appointment: "I've scheduled that appointment for you. You'll receive a confirmation email shortly. Anything else I can help with?",
-        create_ticket: "I've created a support ticket for your issue. Our team will follow up with you shortly. Is there anything else?",
-        escalate: "I'm connecting you with a human agent who can better assist you. Please hold on.",
-        lookup_order: "I looked up that order. It's currently being processed and should ship within 1-2 business days. Would you like tracking info when available?",
-        default: "Thanks for your message! I understand you're asking about: " + state.messages[state.messages.length - 1]?.content?.slice(0, 100) + ". How can I help you further?"
+
+      const name = state.customerInfo?.name ? `${state.customerInfo.name}, ` : '';
+      const summary = state.actionSummary || '';
+
+      const fallbacks: Record<string, string> = {
+        capture_lead: `${name}thank you for reaching out! I've saved your contact details and our team will get back to you within 24 hours. Is there anything else I can help with in the meantime?`,
+        book_appointment: `${name}your appointment has been booked! You'll receive a calendar invite shortly at ${state.customerInfo?.email || 'your email'}. Anything else you'd like to schedule?`,
+        create_ticket: `${name}I've created your support ticket. Here are the details:\n\n${summary}\n\nOur team will follow up shortly. Is there anything urgent I can help with right now?`,
+        escalate: `${name}I hear you, and I'm truly sorry for the inconvenience. I'm connecting you with a human specialist right now who will give you the personal attention you deserve. Please hold on just a moment.`,
+        lookup_order: summary
+          ? `${name}here's what I found:\n\n${summary}\n\nWould you like me to help with anything else regarding this order?`
+          : `${name}I wasn't able to find an order with that number. Could you double-check it for me? You can also share the email address used for the order and I'll look it up that way.`,
+        default: `${name}thanks for your message! I'm here to help. Could you tell me a bit more about what you need? I can assist with orders, tickets, appointments, or just answer any questions you have.`,
       };
-      const fallbackResponse = mockResponses[state.pendingAction || 'default'] || mockResponses.default;
-      return { response: fallbackResponse };
+
+      return { response: fallbacks[state.pendingAction || 'default'] || fallbacks.default };
     }
   }
 
@@ -430,6 +524,8 @@ Respond with ONLY the action identifier (none, capture_lead, book_appointment, c
       customerInfo: input.customerInfo || {},
       pendingAction: null,
       pendingActionData: null,
+      actionSummary: '',
+      sentiment: 'neutral',
       response: '',
     });
 
@@ -438,6 +534,8 @@ Respond with ONLY the action identifier (none, capture_lead, book_appointment, c
       pendingAction: result.pendingAction,
       pendingActionData: result.pendingActionData,
       customerInfo: result.customerInfo,
+      actionSummary: result.actionSummary,
+      sentiment: result.sentiment,
     };
   }
 }
