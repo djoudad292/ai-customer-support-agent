@@ -118,7 +118,7 @@ export class AgentGraph {
 
     const llm = new ChatGoogleGenerativeAI({
       apiKey: this.config.get<string>('GOOGLE_API_KEY'),
-      model: this.config.get<string>('LLM_MODEL', 'gemini-1.5-flash'),
+      model: this.config.get<string>('LLM_MODEL', 'gemini-2.5-flash'),
       maxOutputTokens: 1024,
     });
 
@@ -339,7 +339,7 @@ Respond with ONLY the action identifier (none, capture_lead, book_appointment, c
   private async respondNode(state: typeof AgentState.State) {
     const llm = new ChatGoogleGenerativeAI({
       apiKey: this.config.get<string>('GOOGLE_API_KEY'),
-      model: this.config.get<string>('LLM_MODEL', 'gemini-1.5-flash'),
+      model: this.config.get<string>('LLM_MODEL', 'gemini-2.5-flash'),
       maxOutputTokens: 2048,
     });
 
