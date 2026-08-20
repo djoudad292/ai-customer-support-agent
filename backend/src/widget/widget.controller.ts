@@ -114,7 +114,7 @@ export class WidgetController {
       addMsg(text, 'user');
       inp.value = '';
       document.getElementById('typing').style.display = 'flex';
-      WS.send(JSON.stringify({ type: 'chat', message: text, conversationId: CONV_ID, companyId: COMPANY_ID }));
+      WS.send(JSON.stringify({ event: 'chat', data: { message: text, conversationId: CONV_ID, companyId: COMPANY_ID } }));
     }
 
     document.getElementById('send').onclick = send;
