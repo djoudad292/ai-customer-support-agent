@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { Card, Badge, Button, Spinner, EmptyState, ErrorBanner } from "@supportai/ui";
 
 interface Message {
   id: string;
@@ -36,44 +37,44 @@ export default function Conversations() {
     load();
   }, [status]);
 
-  const statusColors: Record<string, string> = {
-    active: "bg-green-500/10 text-green-400 border-green-500/30",
-    closed: "bg-slate-500/10 text-slate-400 border-slate-500/30",
-    escalated: "bg-orange-500/10 text-orange-400 border-orange-500/30",
+  const statusTones: Record<string, "success" | "neutral" | "warning"> = {
+    active: "success",
+    closed: "neutral",
+    escalated: "warning",
   };
 
   return (
     <div>
       <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold">Conversations</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Conversations</h1>
         <div className="flex flex-wrap gap-2">
           {["", "active", "closed", "escalated"].map((s) => (
-            <button key={s} onClick={() => setStatus(s)} className={`rounded-lg px-3 py-1.5 text-xs sm:text-sm transition-colors ${status === s ? "bg-blue-500 text-white" : "border border-slate-700 text-slate-400 hover:bg-slate-800"}`}>
+            <Button key={s} variant={status === s ? "primary" : "outline"} size="sm" onClick={() => setStatus(s)}>
               {s === "" ? "All" : s[0].toUpperCase() + s.slice(1)}
-            </button>
+            </Button>
           ))}
         </div>
       </div>
-      {error && <div className="mb-6 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">{error}</div>}
+      {error && <ErrorBanner message={error} />}
       {loading ? (
-        <div className="text-slate-400">Loading...</div>
+        <Spinner label="Loading conversations..." />
       ) : items.length === 0 ? (
-        <div className="rounded-xl border border-slate-800 bg-[#111827] p-8 text-center text-slate-400">No conversations yet</div>
+        <EmptyState title="No conversations yet" subtitle="Conversations will appear here when users interact with your AI agent." />
       ) : (
         <div className="space-y-3">
           {items.map((c) => (
-            <div key={c.id} className="rounded-xl border border-slate-800 bg-[#111827] p-4 sm:p-5">
+            <Card key={c.id} className="p-4 sm:p-5 hover:border-border-strong transition-colors">
               <div className="flex items-center justify-between gap-3">
-                <div className="font-medium truncate flex-1">{c.title || "Untitled conversation"}</div>
-                <span className={`shrink-0 rounded-full border px-2 sm:px-3 py-1 text-[10px] sm:text-xs ${statusColors[c.status] || "bg-blue-500/10 text-blue-400 border-blue-500/30"}`}>
+                <div className="font-medium truncate flex-1 text-fg">{c.title || "Untitled conversation"}</div>
+                <Badge tone={statusTones[c.status] || "primary"}>
                   {c.status}
-                </span>
+                </Badge>
               </div>
-              <div className="mt-2 flex items-center justify-between text-xs text-slate-500 gap-2">
+              <div className="mt-2 flex items-center justify-between text-xs text-muted gap-2">
                 <span className="truncate flex-1">{c.messages && c.messages.length > 0 ? c.messages[0].content.slice(0, 80) : "No messages"}</span>
                 <span className="shrink-0 text-[10px]">{new Date(c.updatedAt).toLocaleDateString()}</span>
               </div>
-            </div>
+            </Card>
           ))}
         </div>
       )}

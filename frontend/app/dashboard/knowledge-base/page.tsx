@@ -77,34 +77,31 @@ export default function KnowledgeBase() {
 
   return (
     <div>
-      <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold">Knowledge Base</h1>
-        <button onClick={openCreate} className="rounded-lg bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600 transition-colors w-full sm:w-auto">+ Add Document</button>
-      </div>
-      {error && <div className="mb-6 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">{error}</div>}
+import { Card, CardHeader, CardTitle, Badge, Button, Modal, Input, Textarea, Spinner, EmptyState } from "@supportai/ui";
+// ... (rest of imports)
 
-      {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <form onSubmit={save} className="w-full max-w-lg rounded-2xl border border-slate-800 bg-[#111827] p-6">
-            <h2 className="mb-4 text-lg font-semibold">{editing ? "Edit Document" : "New Document"}</h2>
-            <div className="space-y-4">
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-300">Title</label>
-                <input type="text" required value={form.title || ""} onChange={(e) => setForm({ ...form, title: e.target.value })} className="w-full rounded-lg px-4 py-2.5 text-sm outline-none focus:border-blue-500" />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-300">Content</label>
-                <textarea required rows={10} value={form.content || ""} onChange={(e) => setForm({ ...form, content: e.target.value })} className="w-full rounded-lg px-4 py-2.5 text-sm outline-none focus:border-blue-500" />
-                <p className="mt-1 text-xs text-slate-500">The AI agent uses this content to answer customer questions.</p>
-              </div>
-            </div>
-            <div className="mt-6 flex justify-end gap-3">
-              <button type="button" onClick={() => setShowForm(false)} className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800">Cancel</button>
-              <button type="submit" disabled={saving} className="rounded-lg bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600 disabled:opacity-50">{saving ? "Saving..." : "Save"}</button>
-            </div>
-          </form>
+// ...
+
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Knowledge Base</h1>
+          <Button onClick={openCreate} className="w-full sm:w-auto">+ Add Document</Button>
         </div>
-      )}
+        {error && <ErrorBanner message={error} />}
+
+        {showForm && (
+          <Modal open={true} onClose={() => setShowForm(false)} title={editing ? "Edit Document" : "New Document"}
+            footer={<>
+              <Button variant="ghost" onClick={() => setShowForm(false)}>Cancel</Button>
+              <Button onClick={save} loading={saving}>Save</Button>
+            </>}
+          >
+            <div className="space-y-4">
+              <Input label="Title" type="text" required value={form.title || ""} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+              <Textarea label="Content" required rows={10} value={form.content || ""} onChange={(e) => setForm({ ...form, content: e.target.value })} />
+              <p className="text-xs text-muted">The AI agent uses this content to answer customer questions.</p>
+            </div>
+          </Modal>
+        )}
 
       {loading ? (
         <div className="text-slate-400">Loading...</div>

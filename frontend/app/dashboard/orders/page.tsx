@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { Card, CardHeader, CardTitle, Badge, Button, Modal, Spinner, EmptyState } from "@supportai/ui";
 
 interface Order {
   id: string;
@@ -46,74 +47,61 @@ export default function OrdersPage() {
     } catch (e) { console.error(e); }
   }
 
-  const statusColor: Record<string, string> = {
-    processing: "bg-blue-500/10 text-blue-400",
-    shipped: "bg-yellow-500/10 text-yellow-400",
-    delivered: "bg-green-500/10 text-green-400",
-    cancelled: "bg-red-500/10 text-red-400",
-  };
+  const statusTones: Record<string, "primary" | "warning" | "success" | "danger"> = { processing: "primary", shipped: "warning", delivered: "success", cancelled: "danger" };
 
   const stats = [
-    { label: "Total", value: counts.total, color: "text-white" },
-    { label: "Processing", value: counts.processing, color: "text-blue-400" },
-    { label: "Shipped", value: counts.shipped, color: "text-yellow-400" },
-    { label: "Delivered", value: counts.delivered, color: "text-green-400" },
+    { label: "Total", value: counts.total, tone: "neutral" as const },
+    { label: "Processing", value: counts.processing, tone: "primary" as const },
+    { label: "Shipped", value: counts.shipped, tone: "warning" as const },
+    { label: "Delivered", value: counts.delivered, tone: "success" as const },
   ];
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-bold">Orders</h2>
+      <h2 className="text-xl font-bold tracking-tight">Orders</h2>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {stats.map((s) => (
           <button key={s.label} onClick={() => setFilter(filter === s.label.toLowerCase() ? "" : s.label.toLowerCase())}
-            className={`rounded-lg border border-slate-800 bg-[#111827] p-4 text-left transition-colors hover:border-slate-700 ${filter === s.label.toLowerCase() ? "ring-1 ring-blue-500" : ""}`}>
-            <p className="text-xs text-slate-400">{s.label}</p>
-            <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
+            className={`rounded-2xl border bg-surface p-4 text-left transition-colors hover:border-border-strong ${filter === s.label.toLowerCase() ? "ring-2 ring-primary border-primary" : "border-border"}`}>
+            <p className="text-xs text-muted font-semibold">{s.label}</p>
+            <p className={`text-2xl font-bold text-${s.tone}`}>{s.value}</p>
           </button>
         ))}
       </div>
 
-      {selected && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setSelected(null)}>
-          <div className="w-full max-w-lg rounded-xl border border-slate-700 bg-[#111827] p-6" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-semibold">{selected.orderNumber}</h3>
-              <button onClick={() => setSelected(null)} className="text-slate-400 hover:text-white">✕</button>
-            </div>
-            <div className="space-y-2 text-sm">
-              <p className="text-slate-300">Customer: {selected.customerName || "N/A"} {selected.customerEmail && `(${selected.customerEmail})`}</p>
-              <p className="text-slate-300">Total: {selected.total} {selected.currency}</p>
-              <p className="text-slate-300">Status: <span className={`rounded-full px-2 py-0.5 text-xs ${statusColor[selected.status]}`}>{selected.status}</span></p>
-              {selected.trackingNumber && <p className="text-slate-400">Tracking: {selected.trackingNumber}</p>}
-              <p className="text-slate-500">Created: {new Date(selected.createdAt).toLocaleString()}</p>
-            </div>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {["processing", "shipped", "delivered", "cancelled"].map((s) => (
-                <button key={s} onClick={() => updateOrder(selected.id, s)}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${selected.status === s ? "bg-blue-500 text-white" : "bg-slate-800 text-slate-400 hover:text-white"}`}>
-                  {s}
-                </button>
-              ))}
-            </div>
-          </div>
+      <Modal open={!!selected} onClose={() => setSelected(null)} title={selected?.orderNumber || "Order Details"}
+        footer={<div className="flex flex-wrap gap-2">
+          {["processing", "shipped", "delivered", "cancelled"].map((s) => (
+            <Button key={s} variant={selected?.status === s ? "primary" : "outline"} size="sm" onClick={() => selected && updateOrder(selected.id, s)}>
+              {s}
+            </Button>
+          ))}
+        </div>}
+      >
+        <div className="space-y-2 text-sm mb-4">
+          <p className="text-fg-secondary">Customer: {selected?.customerName || "N/A"} {selected?.customerEmail && `(${selected?.customerEmail})`}</p>
+          <p className="text-fg-secondary">Total: <span className="font-bold text-fg">{selected?.total} {selected?.currency}</span></p>
+          <p className="text-fg-secondary">Status: <Badge tone={statusTones[selected?.status || ""]}>{selected?.status}</Badge></p>
+          {selected?.trackingNumber && <p className="text-muted">Tracking: {selected?.trackingNumber}</p>}
+          <p className="text-muted text-xs mt-4">Created: {selected && new Date(selected.createdAt).toLocaleString()}</p>
         </div>
-      )}
+      </Modal>
 
       <div className="space-y-2">
         {loading ? (
-          <div className="py-12 text-center text-slate-400">Loading...</div>
+          <Spinner label="Loading orders..." />
         ) : orders.length === 0 ? (
-          <div className="rounded-xl border border-slate-800 bg-[#111827] py-12 text-center text-slate-400">No orders yet</div>
+          <EmptyState title="No orders yet" />
         ) : (
           orders.map((o) => (
             <button key={o.id} onClick={() => setSelected(o)}
-              className="flex w-full items-center gap-3 rounded-xl border border-slate-800 bg-[#111827] p-4 text-left transition-colors hover:border-slate-700">
-              <span className="text-sm font-mono text-slate-500">{o.orderNumber}</span>
-              <span className="min-w-0 flex-1 truncate text-sm">{o.customerName || "Unknown"}</span>
-              <span className="text-sm font-medium">${o.total}</span>
-              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusColor[o.status] || ""}`}>{o.status}</span>
-              <span className="text-xs text-slate-500">{new Date(o.createdAt).toLocaleDateString()}</span>
+              className="flex w-full items-center gap-3 rounded-2xl border border-border bg-surface p-4 text-left transition-colors hover:border-border-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-bg">
+              <span className="text-sm font-mono text-muted">{o.orderNumber}</span>
+              <span className="min-w-0 flex-1 truncate text-sm text-fg">{o.customerName || "Unknown"}</span>
+              <span className="text-sm font-bold text-fg">${o.total}</span>
+              <Badge tone={statusTones[o.status]}>{o.status}</Badge>
+              <span className="text-xs text-muted hidden sm:inline">{new Date(o.createdAt).toLocaleDateString()}</span>
             </button>
           ))
         )}

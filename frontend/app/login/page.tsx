@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "../../lib/api";
 import { MessageSquare } from "lucide-react";
+import { Input, Button, ErrorBanner } from "@supportai/ui";
 
 export default function Login() {
   const router = useRouter();
@@ -32,32 +33,26 @@ export default function Login() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#0a0f1a] px-6">
+    <div className="flex min-h-screen items-center justify-center bg-bg px-6">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-blue-500">
-            <MessageSquare className="h-8 w-8 text-white" />
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
+            <MessageSquare className="h-8 w-8 text-primary-foreground" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-50">Sign in</h1>
-          <p className="mt-2 text-sm text-slate-400">Welcome back to AI Customer Support Agent</p>
+          <h1 className="text-2xl font-bold text-foreground">Sign in</h1>
+          <p className="mt-2 text-sm text-muted">Welcome back to AI Customer Support Agent</p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
-          {error && <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">{error}</div>}
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-300">Email</label>
-            <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" className="w-full rounded-lg px-4 py-2.5 text-sm outline-none focus:border-blue-500" />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-300">Password</label>
-            <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="w-full rounded-lg px-4 py-2.5 text-sm outline-none focus:border-blue-500" />
-          </div>
-          <button type="submit" disabled={loading} className="w-full rounded-lg bg-blue-500 py-2.5 text-sm font-semibold text-white hover:bg-blue-600 transition-colors disabled:opacity-50">
-            {loading ? "Signing in..." : "Sign in"}
-          </button>
+          {error && <ErrorBanner message={error} />}
+          <Input label="Email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" />
+          <Input label="Password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
+          <Button type="submit" loading={loading} className="w-full">
+            Sign in
+          </Button>
         </form>
-        <p className="mt-6 text-center text-sm text-slate-400">
+        <p className="mt-6 text-center text-sm text-muted">
           Don't have an account?{" "}
-          <Link href="/register" className="font-medium text-blue-400 hover:underline">Create one</Link>
+          <Link href="/register" className="font-medium text-primary hover:underline">Create one</Link>
         </p>
       </div>
     </div>

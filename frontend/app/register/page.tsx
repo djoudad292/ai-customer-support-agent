@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "../../lib/api";
 import { MessageSquare } from "lucide-react";
+import { Input, Button, ErrorBanner } from "@supportai/ui";
 
 export default function Register() {
   const router = useRouter();
@@ -42,30 +43,27 @@ export default function Register() {
   ];
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#0a0f1a] px-6 py-10">
+    <div className="flex min-h-screen items-center justify-center bg-bg px-6 py-10">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-blue-500">
-            <MessageSquare className="h-8 w-8 text-white" />
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary">
+            <MessageSquare className="h-8 w-8 text-primary-foreground" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-50">Create your account</h1>
-          <p className="mt-2 text-sm text-slate-400">Start with AI Customer Support Agent for free</p>
+          <h1 className="text-2xl font-bold text-foreground">Create your account</h1>
+          <p className="mt-2 text-sm text-muted">Start with AI Customer Support Agent for free</p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
-          {error && <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">{error}</div>}
+          {error && <ErrorBanner message={error} />}
           {fields.map((f) => (
-            <div key={f.key}>
-              <label className="mb-1 block text-sm font-medium text-slate-300">{f.label}</label>
-              <input type={f.type} required value={form[f.key as keyof typeof form]} onChange={(e) => update(f.key, e.target.value)} placeholder={f.placeholder} className="w-full rounded-lg px-4 py-2.5 text-sm outline-none focus:border-blue-500" />
-            </div>
+            <Input key={f.key} label={f.label} type={f.type} required value={form[f.key as keyof typeof form]} onChange={(e) => update(f.key, e.target.value)} placeholder={f.placeholder} />
           ))}
-          <button type="submit" disabled={loading} className="w-full rounded-lg bg-blue-500 py-2.5 text-sm font-semibold text-white hover:bg-blue-600 transition-colors disabled:opacity-50">
-            {loading ? "Creating account..." : "Create account"}
-          </button>
+          <Button type="submit" loading={loading} className="w-full">
+            Create account
+          </Button>
         </form>
-        <p className="mt-6 text-center text-sm text-slate-400">
+        <p className="mt-6 text-center text-sm text-muted">
           Already have an account?{" "}
-          <Link href="/login" className="font-medium text-blue-400 hover:underline">Sign in</Link>
+          <Link href="/login" className="font-medium text-primary hover:underline">Sign in</Link>
         </p>
       </div>
     </div>
