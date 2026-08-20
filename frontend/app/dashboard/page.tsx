@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
-import { GitBranch, MessageSquare, Ticket, BookOpen, Settings } from "lucide-react";
+import { GitBranch, MessageSquare, Ticket, BookOpen, Settings, Package, ClipboardList, CalendarDays } from "lucide-react";
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<any>(null);
@@ -21,12 +21,12 @@ export default function DashboardPage() {
   if (loading) return <div className="py-12 text-center text-slate-400">Loading dashboard...</div>;
 
   const cards = [
-    { label: "Conversations", value: stats?.conversations?.total ?? stats?.conversations ?? 0, icon: "💬", color: "from-blue-500/20 to-blue-600/5 border-blue-500/20" },
-    { label: "Tickets", value: stats?.tickets?.total ?? 0, sub: `${stats?.tickets?.open ?? 0} open`, icon: "🎫", color: "from-yellow-500/20 to-yellow-600/5 border-yellow-500/20" },
-    { label: "Orders", value: stats?.orders?.total ?? 0, sub: `${stats?.orders?.processing ?? 0} processing`, icon: "📦", color: "from-green-500/20 to-green-600/5 border-green-500/20" },
-    { label: "Leads", value: stats?.leads?.total ?? stats?.leads ?? 0, icon: "📋", color: "from-purple-500/20 to-purple-600/5 border-purple-500/20" },
-    { label: "Appointments", value: stats?.appointments?.total ?? stats?.appointments ?? 0, icon: "📅", color: "from-pink-500/20 to-pink-600/5 border-pink-500/20" },
-    { label: "Knowledge Base", value: stats?.documents?.total ?? stats?.documents ?? 0, sub: "docs", icon: "📚", color: "from-cyan-500/20 to-cyan-600/5 border-cyan-500/20" },
+    { label: "Conversations", value: stats?.conversations?.total ?? stats?.conversations ?? 0, icon: MessageSquare, color: "from-blue-500/20 to-blue-600/5 border-blue-500/20" },
+    { label: "Tickets", value: stats?.tickets?.total ?? 0, sub: `${stats?.tickets?.open ?? 0} open`, icon: Ticket, color: "from-yellow-500/20 to-yellow-600/5 border-yellow-500/20" },
+    { label: "Orders", value: stats?.orders?.total ?? 0, sub: `${stats?.orders?.processing ?? 0} processing`, icon: Package, color: "from-green-500/20 to-green-600/5 border-green-500/20" },
+    { label: "Leads", value: stats?.leads?.total ?? stats?.leads ?? 0, icon: ClipboardList, color: "from-purple-500/20 to-purple-600/5 border-purple-500/20" },
+    { label: "Appointments", value: stats?.appointments?.total ?? stats?.appointments ?? 0, icon: CalendarDays, color: "from-pink-500/20 to-pink-600/5 border-pink-500/20" },
+    { label: "Knowledge Base", value: stats?.documents?.total ?? stats?.documents ?? 0, sub: "docs", icon: BookOpen, color: "from-cyan-500/20 to-cyan-600/5 border-cyan-500/20" },
   ];
 
   return (
@@ -36,7 +36,7 @@ export default function DashboardPage() {
         {cards.map((c) => (
           <div key={c.label} className={`rounded-xl border bg-gradient-to-br p-4 ${c.color}`}>
             <div className="mb-3 flex items-center justify-between">
-              <span className="text-2xl">{c.icon}</span>
+              <c.icon className="h-8 w-8 text-current" />
             </div>
             <p className="text-2xl font-bold">{c.value}</p>
             <p className="text-sm text-slate-400">{c.label}{c.sub ? ` · ${c.sub}` : ""}</p>

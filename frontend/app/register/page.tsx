@@ -3,6 +3,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "../../lib/api";
+import { MessageSquare } from "lucide-react";
 
 export default function Register() {
   const router = useRouter();
@@ -44,7 +45,9 @@ export default function Register() {
     <div className="flex min-h-screen items-center justify-center bg-[#0a0f1a] px-6 py-10">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-blue-500 text-2xl">💬</div>
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-blue-500">
+            <MessageSquare className="h-8 w-8 text-white" />
+          </div>
           <h1 className="text-2xl font-bold text-slate-50">Create your account</h1>
           <p className="mt-2 text-sm text-slate-400">Start with AI Customer Support Agent for free</p>
         </div>

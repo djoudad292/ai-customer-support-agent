@@ -1,16 +1,17 @@
 "use client";
 import Link from "next/link";
+import { Bot, Ticket, Package, MessageSquare, ClipboardList, CalendarDays, BookOpen, BarChart3, Plug } from "lucide-react";
 
 const features = [
-  { icon: "🤖", title: "AI Chat 24/7", desc: "Answers customer questions instantly using your knowledge base, powered by LangGraph." },
-  { icon: "🎫", title: "Support Tickets", desc: "AI automatically creates and tracks support tickets when issues are reported." },
-  { icon: "📦", title: "Order Lookup", desc: "Customers can check order status and tracking directly through the AI chat." },
-  { icon: "🔀", title: "Human Escalation", desc: "Seamlessly hands off to a human agent when the AI can't resolve an issue." },
-  { icon: "📋", title: "Lead Capture", desc: "Automatically captures visitor contact details and saves them as leads in your pipeline." },
-  { icon: "📅", title: "Appointment Booking", desc: "Books meetings and appointments directly in chat with dates parsed automatically." },
-  { icon: "📚", title: "Knowledge Base + RAG", desc: "Upload your docs, FAQs, and policies. Semantic vector search pulls accurate answers." },
-  { icon: "📊", title: "Analytics Dashboard", desc: "Track conversations, tickets, orders, leads, AI vs human handling, and more." },
-  { icon: "🔌", title: "One-Line Widget", desc: "Add the AI chat to any website with a single <script> tag. Embeddable and customizable." },
+  { icon: Bot, title: "AI Chat 24/7", desc: "Answers customer questions instantly using your knowledge base, powered by LangGraph." },
+  { icon: Ticket, title: "Support Tickets", desc: "AI automatically creates and tracks support tickets when issues are reported." },
+  { icon: Package, title: "Order Lookup", desc: "Customers can check order status and tracking directly through the AI chat." },
+  { icon: MessageSquare, title: "Human Escalation", desc: "Seamlessly hands off to a human agent when the AI can't resolve an issue." },
+  { icon: ClipboardList, title: "Lead Capture", desc: "Automatically captures visitor contact details and saves them as leads in your pipeline." },
+  { icon: CalendarDays, title: "Appointment Booking", desc: "Books meetings and appointments directly in chat with dates parsed automatically." },
+  { icon: BookOpen, title: "Knowledge Base + RAG", desc: "Upload your docs, FAQs, and policies. Semantic vector search pulls accurate answers." },
+  { icon: BarChart3, title: "Analytics Dashboard", desc: "Track conversations, tickets, orders, leads, AI vs human handling, and more." },
+  { icon: Plug, title: "One-Line Widget", desc: "Add the AI chat to any website with a single <script> tag. Embeddable and customizable." },
 ];
 
 const steps = [
@@ -27,7 +28,7 @@ export default function Home() {
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6">
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-indigo-500">
-              <span className="text-sm">💬</span>
+              <MessageSquare className="h-5 w-5 text-white" />
             </div>
             <span className="text-lg font-semibold">AI Support Agent</span>
           </div>
@@ -69,7 +70,7 @@ export default function Home() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {features.map((f) => (
               <div key={f.title} className="rounded-xl border border-slate-800 bg-[#111827] p-6 transition-colors hover:border-slate-700">
-                <span className="mb-3 block text-3xl">{f.icon}</span>
+                <f.icon className="mb-3 h-8 w-8 text-blue-500" />
                 <h3 className="mb-2 text-base font-semibold">{f.title}</h3>
                 <p className="text-sm leading-relaxed text-slate-400">{f.desc}</p>
               </div>
