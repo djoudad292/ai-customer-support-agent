@@ -77,9 +77,9 @@ export default function KnowledgeBase() {
 
   return (
     <div>
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">Knowledge Base</h1>
-        <button onClick={openCreate} className="rounded-lg bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600 transition-colors">+ Add Document</button>
+        <button onClick={openCreate} className="rounded-lg bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600 transition-colors w-full sm:w-auto">+ Add Document</button>
       </div>
       {error && <div className="mb-6 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">{error}</div>}
 

@@ -1,7 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
-import { GitBranch, MessageSquare, Ticket, BookOpen, Settings, Package, ClipboardList, CalendarDays } from "lucide-react";
+import { GitBranch, MessageSquare, Ticket, BookOpen, Settings, Package, ClipboardList, CalendarDays, Download } from "lucide-react";
+
+const APK_URL = "https://github.com/djoudad292/ai-customer-support-agent/releases/download/latest-apk/ai-customer-support.apk";
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<any>(null);
@@ -53,28 +55,32 @@ export default function DashboardPage() {
         <p className="mt-2 text-xs text-slate-500">Optionally configure: <code className="text-slate-400">window.AI_SUPPORT_CONFIG = {"{'}"} companyId: "your-id" {"}"};</code></p>
       </div>
 
-      <div className="rounded-xl border border-slate-800 bg-[#111827] p-6">
+      <div className="rounded-xl border border-slate-800 bg-[#111827] p-4 sm:p-6">
         <h3 className="mb-4 text-lg font-semibold">Quick Actions</h3>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <a href="/dashboard/graph-inspector" className="rounded-lg border border-slate-700 bg-slate-800/30 p-4 text-center text-sm transition-colors hover:border-blue-500/50 hover:bg-blue-500/5">
-            <GitBranch className="mb-2 h-6 w-6 text-blue-400" />
-            Graph Inspector
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          <a href="/dashboard/graph-inspector" className="rounded-lg border border-slate-700 bg-slate-800/30 p-3 sm:p-4 text-center text-xs sm:text-sm transition-colors hover:border-blue-500/50 hover:bg-blue-500/5">
+            <GitBranch className="mb-2 h-5 w-5 sm:h-6 sm:w-6 text-blue-400 mx-auto" />
+            AI Chat
           </a>
-          <a href="/dashboard/conversations" className="rounded-lg border border-slate-700 bg-slate-800/30 p-4 text-center text-sm transition-colors hover:border-blue-500/50 hover:bg-blue-500/5">
-            <MessageSquare className="mb-2 h-6 w-6 text-blue-400 mx-auto" />
-            View Conversations
+          <a href="/dashboard/conversations" className="rounded-lg border border-slate-700 bg-slate-800/30 p-3 sm:p-4 text-center text-xs sm:text-sm transition-colors hover:border-blue-500/50 hover:bg-blue-500/5">
+            <MessageSquare className="mb-2 h-5 w-5 sm:h-6 sm:w-6 text-blue-400 mx-auto" />
+            Conversations
           </a>
-          <a href="/dashboard/tickets" className="rounded-lg border border-slate-700 bg-slate-800/30 p-4 text-center text-sm transition-colors hover:border-yellow-500/50 hover:bg-yellow-500/5">
-            <Ticket className="mb-2 h-6 w-6 text-yellow-400 mx-auto" />
-            Manage Tickets
+          <a href="/dashboard/tickets" className="rounded-lg border border-slate-700 bg-slate-800/30 p-3 sm:p-4 text-center text-xs sm:text-sm transition-colors hover:border-yellow-500/50 hover:bg-yellow-500/5">
+            <Ticket className="mb-2 h-5 w-5 sm:h-6 sm:w-6 text-yellow-400 mx-auto" />
+            Tickets
           </a>
-          <a href="/dashboard/knowledge-base" className="rounded-lg border border-slate-700 bg-slate-800/30 p-4 text-center text-sm transition-colors hover:border-cyan-500/50 hover:bg-cyan-500/5">
-            <BookOpen className="mb-2 h-6 w-6 text-cyan-400 mx-auto" />
+          <a href="/dashboard/knowledge-base" className="rounded-lg border border-slate-700 bg-slate-800/30 p-3 sm:p-4 text-center text-xs sm:text-sm transition-colors hover:border-cyan-500/50 hover:bg-cyan-500/5">
+            <BookOpen className="mb-2 h-5 w-5 sm:h-6 sm:w-6 text-cyan-400 mx-auto" />
             Knowledge Base
           </a>
-          <a href="/dashboard/settings" className="rounded-lg border border-slate-700 bg-slate-800/30 p-4 text-center text-sm transition-colors hover:border-slate-500/50 hover:bg-slate-500/5">
-            <Settings className="mb-2 h-6 w-6 text-slate-400 mx-auto" />
+          <a href="/dashboard/settings" className="rounded-lg border border-slate-700 bg-slate-800/30 p-3 sm:p-4 text-center text-xs sm:text-sm transition-colors hover:border-slate-500/50 hover:bg-slate-500/5">
+            <Settings className="mb-2 h-5 w-5 sm:h-6 sm:w-6 text-slate-400 mx-auto" />
             Settings
+          </a>
+          <a href={APK_URL} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-green-500/30 bg-green-500/5 p-3 sm:p-4 text-center text-xs sm:text-sm transition-colors hover:border-green-500/50 hover:bg-green-500/10">
+            <Download className="mb-2 h-5 w-5 sm:h-6 sm:w-6 text-green-400 mx-auto" />
+            Download App
           </a>
         </div>
       </div>

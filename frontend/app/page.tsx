@@ -1,6 +1,8 @@
 "use client";
 import Link from "next/link";
-import { Bot, Ticket, Package, MessageSquare, ClipboardList, CalendarDays, BookOpen, BarChart3, Plug } from "lucide-react";
+import { Bot, Ticket, Package, MessageSquare, ClipboardList, CalendarDays, BookOpen, BarChart3, Plug, Download, Smartphone } from "lucide-react";
+
+const APK_URL = "https://github.com/djoudad292/ai-customer-support-agent/releases/download/latest-apk/ai-customer-support.apk";
 
 const features = [
   { icon: Bot, title: "AI Chat 24/7", desc: "Answers customer questions instantly using your knowledge base, powered by LangGraph." },
@@ -93,6 +95,19 @@ export default function Home() {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      <section className="px-4 py-16">
+        <div className="mx-auto max-w-2xl rounded-2xl border border-green-500/20 bg-green-500/5 p-8 text-center sm:p-12">
+          <Smartphone className="mx-auto mb-4 h-12 w-12 text-green-400" />
+          <h2 className="mb-4 text-2xl font-bold sm:text-3xl">Download the Mobile App</h2>
+          <p className="mb-8 text-slate-400">Manage your customer support from anywhere. Available for Android.</p>
+          <a href={APK_URL} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-8 py-3 font-medium text-white hover:bg-green-500 transition-colors">
+            <Download className="h-5 w-5" />
+            Download APK
+          </a>
+          <p className="mt-4 text-xs text-slate-500">Requires Android 8.0+. Auto-updates via GitHub.</p>
         </div>
       </section>
 

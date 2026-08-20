@@ -44,11 +44,11 @@ export default function Conversations() {
 
   return (
     <div>
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">Conversations</h1>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {["", "active", "closed", "escalated"].map((s) => (
-            <button key={s} onClick={() => setStatus(s)} className={`rounded-lg px-3 py-1.5 text-sm transition-colors ${status === s ? "bg-blue-500 text-white" : "border border-slate-700 text-slate-400 hover:bg-slate-800"}`}>
+            <button key={s} onClick={() => setStatus(s)} className={`rounded-lg px-3 py-1.5 text-xs sm:text-sm transition-colors ${status === s ? "bg-blue-500 text-white" : "border border-slate-700 text-slate-400 hover:bg-slate-800"}`}>
               {s === "" ? "All" : s[0].toUpperCase() + s.slice(1)}
             </button>
           ))}
@@ -62,16 +62,16 @@ export default function Conversations() {
       ) : (
         <div className="space-y-3">
           {items.map((c) => (
-            <div key={c.id} className="rounded-xl border border-slate-800 bg-[#111827] p-5">
-              <div className="flex items-center justify-between">
-                <div className="font-medium">{c.title || "Untitled conversation"}</div>
-                <span className={`rounded-full border px-3 py-1 text-xs ${statusColors[c.status] || "bg-blue-500/10 text-blue-400 border-blue-500/30"}`}>
+            <div key={c.id} className="rounded-xl border border-slate-800 bg-[#111827] p-4 sm:p-5">
+              <div className="flex items-center justify-between gap-3">
+                <div className="font-medium truncate flex-1">{c.title || "Untitled conversation"}</div>
+                <span className={`shrink-0 rounded-full border px-2 sm:px-3 py-1 text-[10px] sm:text-xs ${statusColors[c.status] || "bg-blue-500/10 text-blue-400 border-blue-500/30"}`}>
                   {c.status}
                 </span>
               </div>
-              <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
-                <span>{c.messages && c.messages.length > 0 ? c.messages[0].content.slice(0, 80) : "No messages"}</span>
-                <span>{new Date(c.updatedAt).toLocaleString()}</span>
+              <div className="mt-2 flex items-center justify-between text-xs text-slate-500 gap-2">
+                <span className="truncate flex-1">{c.messages && c.messages.length > 0 ? c.messages[0].content.slice(0, 80) : "No messages"}</span>
+                <span className="shrink-0 text-[10px]">{new Date(c.updatedAt).toLocaleDateString()}</span>
               </div>
             </div>
           ))}

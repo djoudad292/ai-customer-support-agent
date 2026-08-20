@@ -49,11 +49,11 @@ export default function Appointments() {
 
   return (
     <div>
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">Appointments</h1>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {["", "requested", "confirmed", "cancelled", "completed"].map((s) => (
-            <button key={s} onClick={() => setStatus(s)} className={`rounded-lg px-3 py-1.5 text-sm transition-colors ${status === s ? "bg-blue-500 text-white" : "border border-slate-700 text-slate-400 hover:bg-slate-800"}`}>
+            <button key={s} onClick={() => setStatus(s)} className={`rounded-lg px-3 py-1.5 text-xs sm:text-sm transition-colors ${status === s ? "bg-blue-500 text-white" : "border border-slate-700 text-slate-400 hover:bg-slate-800"}`}>
               {s === "" ? "All" : s[0].toUpperCase() + s.slice(1)}
             </button>
           ))}
