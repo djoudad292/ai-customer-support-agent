@@ -1,46 +1,71 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
-import { View, Text, FlatList, TextInput, TouchableOpacity, Alert, KeyboardAvoidingView, Platform, Animated, Easing } from 'react-native'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import {
+  View,
+  Text,
+  FlatList,
+  TextInput,
+  TouchableOpacity,
+  KeyboardAvoidingView,
+  Platform,
+  Animated,
+  Easing,
+  StyleSheet,
+  ScrollView,
+} from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
-import { Screen, Spinner, EmptyState } from '@/components/ui'
-import { StackHeader } from '@/components/stack-header'
-import { apiFetch, paginate } from '@/lib/api'
+import { apiFetch } from '@/lib/api'
 import { Colors } from '@/lib/theme'
+import { StackHeader } from '@/components/stack-header'
 
-interface Document {
+interface ChatMetadata {
+  type: string
+  title?: string
+  options: { label: string; value: string }[]
+}
+
+interface ChatMessage {
   id: string
-  title: string
-  status: string
-}
-
-interface Source {
-  chunkText: string
-  similarity: number
-}
-
-interface AskResult {
-  answer: string
-  sources: Source[]
-}
-
-interface Message {
-  id: number
   role: 'user' | 'assistant'
   text: string
-  sources?: Source[]
-  reveal: number
-  showSources?: boolean
+  metadata?: ChatMetadata | null
+  trace?: any[]
+  timestamp: number
+}
+
+const WELCOME_MSG: ChatMessage = {
+  id: 'welcome',
+  role: 'assistant',
+  text: "Hello! I'm your AI customer support assistant. I can help you with tickets, orders, appointments, and more. What would you like to do?",
+  metadata: {
+    type: 'quick_replies',
+    options: [
+      { label: 'Create Ticket', value: 'I need to create a ticket' },
+      { label: 'Track Order', value: 'I want to check my order' },
+      { label: 'Book Appointment', value: 'I want to book an appointment' },
+      { label: 'Talk to Human', value: 'I want to talk to a human agent' },
+    ],
+  },
+  timestamp: Date.now(),
+}
+
+const NODE_COLORS: Record<string, string> = {
+  understand: '#3B82F6',
+  retrieveKnowledge: '#A855F7',
+  decideAction: '#F59E0B',
+  captureLead: '#22C55E',
+  bookAppointment: '#06B6D4',
+  createTicket: '#F97316',
+  lookupOrder: '#6366F1',
+  escalateToHuman: '#EF4444',
+  respond: '#10B981',
 }
 
 function TypingDots() {
-  const dots = useRef([
-    new Animated.Value(0),
-    new Animated.Value(0),
-    new Animated.Value(0),
-  ]).current
+  const dots = useRef([new Animated.Value(0), new Animated.Value(0), new Animated.Value(0)]).current
 
   useEffect(() => {
-    const animations = dots.map((dot, i) =>
+    const anims = dots.map((dot, i) =>
       Animated.loop(
         Animated.sequence([
           Animated.delay(i * 140),
@@ -50,8 +75,8 @@ function TypingDots() {
         ])
       )
     )
-    animations.forEach((a) => a.start())
-    return () => animations.forEach((a) => a.stop())
+    anims.forEach((a) => a.start())
+    return () => anims.forEach((a) => a.stop())
   }, [dots])
 
   return (
@@ -60,12 +85,11 @@ function TypingDots() {
         <Animated.View
           key={i}
           style={{
-            width: 7,
-            height: 7,
-            borderRadius: 3.5,
-            backgroundColor: Colors.mutedForeground,
-            opacity: dot.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] }),
-            transform: [{ translateY: dot.interpolate({ inputRange: [0, 1], outputRange: [0, -4] }) }],
+            width: 8,
+            height: 8,
+            borderRadius: 4,
+            backgroundColor: Colors.primary,
+            opacity: dot,
           }}
         />
       ))}
@@ -73,127 +97,169 @@ function TypingDots() {
   )
 }
 
-export default function AskScreen() {
+function TraceChips({ trace }: { trace: any[] }) {
+  const [expanded, setExpanded] = useState(false)
+
+  return (
+    <View style={{ marginTop: 6 }}>
+      <TouchableOpacity onPress={() => setExpanded(!expanded)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+        <Ionicons name="git-branch-outline" size={12} color={Colors.mutedForeground} />
+        <Text style={{ fontSize: 11, color: Colors.mutedForeground }}>
+          {trace.length} graph nodes {expanded ? '▲' : '▼'}
+        </Text>
+      </TouchableOpacity>
+      {expanded && (
+        <View style={{ marginTop: 6, backgroundColor: Colors.cardAlt, borderRadius: 8, padding: 10, borderWidth: 1, borderColor: Colors.border }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
+            {trace.map((step, j) => {
+              const name = Object.keys(step)[0]
+              const color = NODE_COLORS[name] || '#64748B'
+              return (
+                <View key={j} style={{ backgroundColor: color, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 }}>
+                  <Text style={{ color: '#fff', fontSize: 10, fontWeight: '600' }}>{name}</Text>
+                </View>
+              )
+            })}
+          </View>
+          {trace.map((step, j) => {
+            const name = Object.keys(step)[0]
+            const color = NODE_COLORS[name] || '#64748B'
+            const data = step[name]
+            return (
+              <View key={j} style={{ flexDirection: 'row', gap: 6, marginBottom: 6, alignItems: 'flex-start' }}>
+                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color, marginTop: 3 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: Colors.foreground, fontSize: 11, fontWeight: '600' }}>{name}</Text>
+                  {Object.keys(data).length > 0 && (
+                    <Text style={{ color: Colors.mutedForeground, fontSize: 10, marginTop: 2 }} numberOfLines={4}>
+                      {JSON.stringify(data, null, 1)}
+                    </Text>
+                  )}
+                </View>
+              </View>
+            )
+          })}
+        </View>
+      )}
+    </View>
+  )
+}
+
+export default function ChatScreen() {
   const router = useRouter()
-  const [documents, setDocuments] = useState<Document[]>([])
-  const [loading, setLoading] = useState(true)
-  const [selectedId, setSelectedId] = useState('')
-  const [question, setQuestion] = useState('')
-  const [messages, setMessages] = useState<Message[]>([])
-  const [asking, setAsking] = useState(false)
-  const nextId = useRef(0)
-  const revealRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const listRef = useRef<FlatList<Message>>(null)
+  const [messages, setMessages] = useState<ChatMessage[]>([WELCOME_MSG])
+  const [input, setInput] = useState('')
+  const [loading, setLoading] = useState(false)
+  const flatListRef = useRef<FlatList>(null)
+  const conversationIdRef = useRef<string>(Math.random().toString(36).substring(2))
 
-  const load = useCallback(async () => {
-    try {
-      const data = await apiFetch('/knowledge-base?page=1&limit=100')
-      const ready = paginate<Document>(data).items.filter((d) => d.status === 'ready')
-      setDocuments(ready)
-      if (ready.length === 1 && !selectedId) setSelectedId(ready[0].id)
-    } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Failed to load documents')
-    } finally {
-      setLoading(false)
-    }
-  }, [selectedId])
-
-  useEffect(() => {
-    load()
-  }, [load])
-
-  useEffect(() => {
-    return () => {
-      if (revealRef.current) clearInterval(revealRef.current)
-    }
+  const scrollToBottom = useCallback(() => {
+    setTimeout(() => {
+      flatListRef.current?.scrollToEnd({ animated: true })
+    }, 100)
   }, [])
 
   useEffect(() => {
-    listRef.current?.scrollToEnd({ animated: true })
-  }, [messages, asking])
+    scrollToBottom()
+  }, [messages, scrollToBottom])
 
-  const revealAnswer = (id: number, answer: string) => {
-    const words = answer.split(' ')
-    let revealed = 0
-    revealRef.current = setInterval(() => {
-      revealed += 2
-      if (revealed >= words.length) {
-        revealed = words.length
-        if (revealRef.current) clearInterval(revealRef.current)
-      }
-      setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, reveal: revealed } : m)))
-    }, 30)
-  }
+  const sendMessage = useCallback(async (text: string) => {
+    if (!text.trim() || loading) return
 
-  const ask = async () => {
-    const q = question.trim()
-    if (!selectedId) {
-      Alert.alert('Select a document', 'Pick a ready document before asking.')
-      return
+    const userMsg: ChatMessage = {
+      id: Date.now().toString(),
+      role: 'user',
+      text: text.trim(),
+      timestamp: Date.now(),
     }
-    if (!q) return
-    if (revealRef.current) clearInterval(revealRef.current)
-    const userMsg: Message = { id: nextId.current++, role: 'user', text: q, reveal: -1 }
     setMessages((prev) => [...prev, userMsg])
-    setQuestion('')
-    setAsking(true)
+    setInput('')
+    setLoading(true)
+
     try {
-      const result = await apiFetch<AskResult>(`/knowledge-base/${selectedId}/ask`, {
+      const data = await apiFetch<{ response: string; metadata?: ChatMetadata; trace: any[] }>('/agent/chat', {
         method: 'POST',
-        body: JSON.stringify({ question: q }),
+        body: JSON.stringify({ conversationId: conversationIdRef.current, message: text }),
       })
-      const assistantMsg: Message = { id: nextId.current++, role: 'assistant', text: result.answer, sources: result.sources, reveal: 0 }
+
+      const assistantMsg: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        text: data.response,
+        metadata: data.metadata,
+        trace: data.trace,
+        timestamp: Date.now(),
+      }
       setMessages((prev) => [...prev, assistantMsg])
-      revealAnswer(assistantMsg.id, result.answer)
-    } catch (err: any) {
-      const text = `Error: ${err?.message || 'Something went wrong'}`
-      setMessages((prev) => [...prev, { id: nextId.current++, role: 'assistant', text, reveal: -1 }])
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        { id: (Date.now() + 1).toString(), role: 'assistant', text: 'Sorry, something went wrong. Please try again.', timestamp: Date.now() },
+      ])
     } finally {
-      setAsking(false)
+      setLoading(false)
     }
+  }, [loading])
+
+  const handleReset = () => {
+    setMessages([WELCOME_MSG])
+    conversationIdRef.current = Math.random().toString(36).substring(2)
   }
 
-  const toggleSources = (id: number) => {
-    setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, showSources: !m.showSources } : m)))
-  }
-
-  const renderMessage = ({ item }: { item: Message }) => {
+  const renderItem = ({ item, index }: { item: ChatMessage; index: number }) => {
     const isUser = item.role === 'user'
-    const done = item.reveal < 0 || item.reveal >= item.text.split(' ').length
-    const visible = item.reveal >= 0 ? item.text.split(' ').slice(0, item.reveal).join(' ') : item.text
-    return (
-      <View style={{ alignSelf: isUser ? 'flex-end' : 'flex-start', maxWidth: '85%', marginBottom: 10 }}>
-        <View
-          style={{
-            backgroundColor: isUser ? Colors.primary : Colors.muted,
-            borderRadius: 16,
-            borderBottomRightRadius: isUser ? 4 : 16,
-            borderBottomLeftRadius: isUser ? 16 : 4,
-            paddingHorizontal: 14,
-            paddingVertical: 10,
-          }}
-        >
-          <Text style={{ color: isUser ? Colors.primaryForeground : Colors.foreground, fontSize: 14, lineHeight: 20 }}>
-            {visible}
-            {item.reveal >= 0 && !done && <Text style={{ color: Colors.primary }}>▍</Text>}
-          </Text>
-        </View>
 
-        {!isUser && item.sources && item.sources.length > 0 && done && (
-          <TouchableOpacity onPress={() => toggleSources(item.id)} style={{ marginTop: 6 }}>
-            <Text style={{ color: Colors.primary, fontSize: 12, fontWeight: '600' }}>
-              {item.showSources ? 'Hide sources' : `Show ${item.sources.length} source${item.sources.length > 1 ? 's' : ''}`}
-            </Text>
-          </TouchableOpacity>
+    return (
+      <View style={[styles.messageRow, isUser ? styles.messageRowUser : styles.messageRowBot]}>
+        {!isUser && (
+          <View style={styles.botAvatar}>
+            <Ionicons name="chatbubble" size={14} color={Colors.primary} />
+          </View>
         )}
-        {!isUser && item.sources && item.showSources && (
-          <View style={{ marginTop: 6, gap: 4 }}>
-            {item.sources.map((s, i) => (
-              <View key={i} style={{ backgroundColor: Colors.secondary, borderWidth: 1, borderColor: Colors.border, borderRadius: 8, padding: 8 }}>
-                <Text style={{ color: Colors.mutedForeground, fontSize: 10, marginBottom: 2 }}>Match {Math.round(s.similarity * 100)}%</Text>
-                <Text numberOfLines={2} style={{ color: Colors.foreground, fontSize: 11 }}>{s.chunkText}</Text>
+        <View style={{ maxWidth: '78%' }}>
+          <View style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleBot]}>
+            <Text style={[styles.bubbleText, isUser ? styles.bubbleTextUser : styles.bubbleTextBot]}>
+              {item.text}
+            </Text>
+          </View>
+
+          {/* Buttons */}
+          {item.metadata && item.metadata.options.length > 0 && (
+            <View style={{ marginTop: 8, gap: 6 }}>
+              {item.metadata.title && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 2 }}>
+                  <Ionicons name="sparkles" size={12} color="#FACC15" />
+                  <Text style={{ fontSize: 11, fontWeight: '600', color: '#FACC15' }}>{item.metadata.title}</Text>
+                </View>
+              )}
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                {item.metadata.options.map((opt) => (
+                  <TouchableOpacity
+                    key={opt.value}
+                    onPress={() => sendMessage(opt.value)}
+                    disabled={loading}
+                    activeOpacity={0.7}
+                    style={[
+                      styles.button,
+                      item.metadata?.type === 'confirmation' ? styles.buttonConfirm : styles.buttonDefault,
+                      loading && { opacity: 0.5 },
+                    ]}
+                  >
+                    <Text style={[styles.buttonText, item.metadata?.type === 'confirmation' ? styles.buttonTextConfirm : styles.buttonTextDefault]}>
+                      {opt.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
               </View>
-            ))}
+            </View>
+          )}
+
+          {/* Trace */}
+          {item.trace && item.trace.length > 0 && <TraceChips trace={item.trace} />}
+        </View>
+        {isUser && (
+          <View style={styles.userAvatar}>
+            <Ionicons name="person" size={14} color={Colors.mutedForeground} />
           </View>
         )}
       </View>
@@ -201,96 +267,168 @@ export default function AskScreen() {
   }
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: Colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <Screen>
-        <StackHeader title="Ask a document" onBack={() => router.back()} />
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: Colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={90}>
+      <View style={{ flex: 1 }}>
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.headerBtn}>
+            <Ionicons name="chevron-back" size={22} color={Colors.foreground} />
+          </TouchableOpacity>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.headerTitle}>AI Customer Support</Text>
+            <Text style={styles.headerSub}>LangGraph Powered</Text>
+          </View>
+          <TouchableOpacity onPress={handleReset} style={styles.headerBtn}>
+            <Ionicons name="refresh" size={20} color={Colors.foreground} />
+          </TouchableOpacity>
+        </View>
 
-        {loading ? (
-          <Spinner label="Loading documents…" />
-        ) : documents.length === 0 ? (
-          <EmptyState
-            icon={<Ionicons name="chatbubble-ellipses-outline" size={40} color={Colors.mutedForeground} />}
-            title="Nothing to ask yet"
-            subtitle="Upload and process a document first — questions will be answered from its content."
-          />
-        ) : (
-          <>
-            <Text style={{ color: Colors.mutedForeground, fontSize: 13, marginBottom: 6 }}>Document</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
-              {documents.map((doc) => (
-                <TouchableOpacity
-                  key={doc.id}
-                  onPress={() => setSelectedId(doc.id)}
-                  style={{
-                    borderWidth: 1,
-                    borderColor: selectedId === doc.id ? Colors.primary : Colors.border,
-                    backgroundColor: selectedId === doc.id ? Colors.primarySoft : Colors.muted,
-                    borderRadius: 999,
-                    paddingHorizontal: 12,
-                    paddingVertical: 6,
-                  }}
-                >
-                  <Text
-                    style={{ color: selectedId === doc.id ? Colors.primary : Colors.mutedForeground, fontSize: 12, fontWeight: '600' }}
-                    numberOfLines={1}
-                  >
-                    {doc.title}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+        {/* Messages */}
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={{ padding: 14, paddingBottom: 10 }}
+          showsVerticalScrollIndicator={false}
+          onContentSizeChange={scrollToBottom}
+        />
+
+        {/* Typing */}
+        {loading && (
+          <View style={styles.messageRow}>
+            <View style={styles.botAvatar}>
+              <Ionicons name="chatbubble" size={14} color={Colors.primary} />
             </View>
-
-            <FlatList
-              ref={listRef}
-              data={messages}
-              keyExtractor={(m) => String(m.id)}
-              renderItem={renderMessage}
-              style={{ flex: 1 }}
-              contentContainerStyle={{ paddingBottom: 12 }}
-              ListEmptyComponent={
-                <Text style={{ color: Colors.mutedForeground, fontSize: 13, textAlign: 'center', marginTop: 24 }}>
-                  Ask a question and the answer (with sources) will appear here.
-                </Text>
-              }
-            />
-
-            {asking && (
-              <View style={{ alignSelf: 'flex-start', backgroundColor: Colors.muted, borderRadius: 16, borderBottomLeftRadius: 4, paddingHorizontal: 14, paddingVertical: 10, marginBottom: 6 }}>
-                <TypingDots />
-              </View>
-            )}
-
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 8 }}>
-              <TextInput
-                value={question}
-                onChangeText={setQuestion}
-                placeholder="Ask a question…"
-                placeholderTextColor={Colors.mutedForeground}
-                style={{
-                  flex: 1,
-                  backgroundColor: Colors.muted,
-                  borderWidth: 1,
-                  borderColor: Colors.border,
-                  borderRadius: 12,
-                  paddingHorizontal: 14,
-                  paddingVertical: 10,
-                  color: Colors.foreground,
-                  fontSize: 15,
-                }}
-                returnKeyType="send"
-                onSubmitEditing={ask}
-              />
-              <TouchableOpacity
-                onPress={ask}
-                disabled={asking}
-                style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center', opacity: asking || !question.trim() ? 0.5 : 1 }}
-              >
-                <Ionicons name="send" size={18} color={Colors.primaryForeground} />
-              </TouchableOpacity>
+            <View style={[styles.bubble, styles.bubbleBot]}>
+              <TypingDots />
             </View>
-          </>
+          </View>
         )}
-      </Screen>
+
+        {/* Input */}
+        <View style={styles.inputBar}>
+          <TextInput
+            value={input}
+            onChangeText={setInput}
+            placeholder="Type your message..."
+            placeholderTextColor={Colors.mutedForeground}
+            style={styles.textInput}
+            editable={!loading}
+            onSubmitEditing={() => sendMessage(input)}
+            returnKeyType="send"
+          />
+          <TouchableOpacity
+            onPress={() => sendMessage(input)}
+            disabled={loading || !input.trim()}
+            style={[styles.sendBtn, (loading || !input.trim()) && { opacity: 0.4 }]}
+          >
+            <Ionicons name="send" size={18} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      </View>
     </KeyboardAvoidingView>
   )
 }
+
+const styles = StyleSheet.create({
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    backgroundColor: Colors.background,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  headerBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: Colors.muted,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: { color: Colors.foreground, fontSize: 16, fontWeight: '700' },
+  headerSub: { color: Colors.mutedForeground, fontSize: 11, marginTop: 1 },
+
+  messageRow: { flexDirection: 'row', gap: 8, marginBottom: 14, alignItems: 'flex-end' },
+  messageRowUser: { justifyContent: 'flex-end' },
+  messageRowBot: { justifyContent: 'flex-start' },
+
+  botAvatar: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: Colors.primarySoft,
+    borderWidth: 1,
+    borderColor: 'rgba(59,130,246,0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  userAvatar: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: Colors.muted,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  bubble: { borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10 },
+  bubbleUser: { backgroundColor: Colors.primary, borderBottomRightRadius: 6 },
+  bubbleBot: { backgroundColor: Colors.card, borderWidth: 1, borderColor: Colors.border, borderBottomLeftRadius: 6 },
+
+  bubbleText: { fontSize: 14, lineHeight: 20 },
+  bubbleTextUser: { color: '#fff' },
+  bubbleTextBot: { color: Colors.foreground },
+
+  button: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  buttonConfirm: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  buttonDefault: {
+    backgroundColor: Colors.muted,
+    borderColor: Colors.border,
+  },
+  buttonText: { fontSize: 12, fontWeight: '600' },
+  buttonTextConfirm: { color: '#fff' },
+  buttonTextDefault: { color: Colors.foreground },
+
+  inputBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 10,
+    backgroundColor: Colors.background,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  textInput: {
+    flex: 1,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: Colors.muted,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingHorizontal: 16,
+    color: Colors.foreground,
+    fontSize: 14,
+  },
+  sendBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+})

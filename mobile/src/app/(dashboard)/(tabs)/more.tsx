@@ -7,7 +7,7 @@ import { Ionicons } from '@expo/vector-icons'
 
 const sections = [
   { key: 'analytics', label: 'Analytics', desc: 'Track performance metrics', icon: 'stats-chart-outline', color: Colors.blue },
-  { key: 'ask', label: 'Ask Documents', desc: 'Ask questions with cited sources', icon: 'chatbubble-ellipses-outline', color: Colors.purple },
+  { key: 'ask', label: 'AI Chat', desc: 'Interactive AI support with buttons', icon: 'chatbubble-ellipses-outline', color: Colors.purple },
   { key: 'summary', label: 'Summaries', desc: 'Generate document summaries', icon: 'sparkles-outline', color: Colors.orange },
   { key: 'knowledge', label: 'Knowledge Base', desc: 'Manage your AI training docs', icon: 'document-text-outline', color: Colors.green },
   { key: 'team', label: 'Team', desc: 'Invite and manage agents', icon: 'shield-outline', color: Colors.purple },

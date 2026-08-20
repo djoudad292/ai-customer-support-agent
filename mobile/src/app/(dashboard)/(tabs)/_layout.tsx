@@ -12,6 +12,7 @@ const icon: Record<string, [keyof typeof Ionicons.glyphMap, keyof typeof Ionicon
   leads: ['people-outline', 'people'],
   appointments: ['calendar-outline', 'calendar'],
   more: ['ellipsis-horizontal-circle-outline', 'ellipsis-horizontal-circle'],
+  chat: ['chatbubble-ellipses-outline', 'chatbubble-ellipses'],
 }
 
 export default function TabsLayout() {
@@ -55,6 +56,7 @@ export default function TabsLayout() {
           key={name}
           name={name}
           options={{
+            tabBarLabel: name === 'chat' ? 'AI Chat' : undefined,
             tabBarIcon: ({ color, size, focused }) => (
               <View>
                 <Ionicons name={icon[name][focused ? 1 : 0]} size={size} color={color} />
