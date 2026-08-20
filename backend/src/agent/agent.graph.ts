@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
+import { ChatOpenAI } from '@langchain/openai';
 import { StateGraph, Annotation, START, END } from '@langchain/langgraph';
 import { PrismaService } from '../common/prisma.service';
 
@@ -116,10 +116,14 @@ export class AgentGraph {
     const lastMessage = state.messages[state.messages.length - 1];
     if (!lastMessage) return { pendingAction: null };
 
-    const llm = new ChatGoogleGenerativeAI({
-      apiKey: this.config.get<string>('GOOGLE_API_KEY'),
-      model: this.config.get<string>('LLM_MODEL', 'gemini-2.5-flash'),
-      maxOutputTokens: 1024,
+    const llm = new ChatOpenAI({
+      apiKey: this.config.get<string>('OPENROUTER_API_KEY'),
+      modelName: this.config.get<string>('LLM_MODEL', 'meta-llama/llama-3.1-8b-instruct'),
+      maxTokens: 1024,
+      temperature: 0,
+      configuration: {
+        baseURL: 'https://openrouter.ai/api/v1',
+      },
     });
 
     const conversationHistory = state.messages
@@ -362,10 +366,14 @@ Respond with ONLY the action identifier (none, capture_lead, book_appointment, c
   }
 
   private async respondNode(state: typeof AgentState.State) {
-    const llm = new ChatGoogleGenerativeAI({
-      apiKey: this.config.get<string>('GOOGLE_API_KEY'),
-      model: this.config.get<string>('LLM_MODEL', 'gemini-2.5-flash'),
-      maxOutputTokens: 2048,
+    const llm = new ChatOpenAI({
+      apiKey: this.config.get<string>('OPENROUTER_API_KEY'),
+      modelName: this.config.get<string>('LLM_MODEL', 'meta-llama/llama-3.1-8b-instruct'),
+      maxTokens: 2048,
+      temperature: 0.7,
+      configuration: {
+        baseURL: 'https://openrouter.ai/api/v1',
+      },
     });
 
     let actionNote = '';

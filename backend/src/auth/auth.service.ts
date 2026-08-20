@@ -17,11 +17,12 @@ export class AuthService {
     }
 
     const passwordHash = await bcrypt.hash(data.password, 10);
+    const companyName = data.companyName || 'Default Company';
     const company = await this.prisma.company.create({
       data: {
         id: crypto.randomUUID(),
-        name: data.companyName,
-        slug: data.companyName.toLowerCase().replace(/\s+/g, '-'),
+        name: companyName,
+        slug: companyName.toLowerCase().replace(/\s+/g, '-'),
         plan: 'free',
         settings: {},
       },
