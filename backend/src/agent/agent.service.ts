@@ -81,6 +81,7 @@ export class AgentService {
         response: result.response,
         action: result.pendingAction,
         trace: this.trace,
+        metadata: result.responseMetadata,
       };
     }
 
@@ -101,7 +102,8 @@ export class AgentService {
       conversationId,
       response: result.response,
       action: result.pendingAction,
-      trace: this.trace, // Return trace for demo transparency
+      trace: this.trace,
+      metadata: result.responseMetadata,
     };
   }
 }

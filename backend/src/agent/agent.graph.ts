@@ -34,6 +34,10 @@ export const AgentState = Annotation.Root({
     default: () => 'neutral',
   }),
   response: Annotation<string>(),
+  responseMetadata: Annotation<Record<string, any> | null>({
+    reducer: (current, update) => update ?? current,
+    default: () => null,
+  }),
 });
 
 @Injectable()
@@ -489,25 +493,73 @@ Examples of good responses:
 
     try {
       const result = await llm.invoke([systemPrompt, ...conversationHistory]);
-      return { response: result.content.toString() };
+      const responseContent = result.content.toString();
+
+      let metadata: Record<string, any> | null = null;
+      if (state.pendingAction === 'create_ticket') {
+        metadata = { type: 'confirmation', title: 'Ticket Created', options: [{ label: 'Check Status', value: 'check_status' }, { label: 'Close', value: 'done' }] };
+      } else if (state.pendingAction === 'capture_lead') {
+        metadata = { type: 'confirmation', title: 'Contact Saved', options: [{ label: 'Ask Something Else', value: 'help' }, { label: 'Done', value: 'done' }] };
+      } else if (state.pendingAction === 'book_appointment') {
+        metadata = { type: 'confirmation', title: 'Appointment Booked', options: [{ label: 'Reschedule', value: 'reschedule' }, { label: 'Cancel', value: 'cancel' }] };
+      } else if (state.pendingAction === 'lookup_order') {
+        metadata = { type: 'choice', options: [{ label: 'Track Package', value: 'track' }, { label: 'Request Return', value: 'return' }, { label: 'Done', value: 'done' }] };
+      } else if (state.pendingAction === 'escalate') {
+        metadata = { type: 'confirmation', title: 'Escalated', options: [] };
+      } else {
+        metadata = { type: 'quick_replies', options: [
+          { label: 'Create Ticket', value: 'I need to create a ticket' },
+          { label: 'Track Order', value: 'I want to check my order' },
+          { label: 'Book Appointment', value: 'I want to book an appointment' },
+          { label: 'Talk to Human', value: 'I want to talk to a human agent' }
+        ]};
+      }
+
+      return { response: responseContent, responseMetadata: metadata };
     } catch (error) {
       this.logger.error(`Respond node failed: ${error}`);
 
       const name = state.customerInfo?.name ? `${state.customerInfo.name}, ` : '';
       const summary = state.actionSummary || '';
 
-      const fallbacks: Record<string, string> = {
-        capture_lead: `${name}thank you for reaching out! I've saved your contact details and our team will get back to you within 24 hours. Is there anything else I can help with in the meantime?`,
-        book_appointment: `${name}your appointment has been booked! You'll receive a calendar invite shortly at ${state.customerInfo?.email || 'your email'}. Anything else you'd like to schedule?`,
-        create_ticket: `${name}I've created your support ticket. Here are the details:\n\n${summary}\n\nOur team will follow up shortly. Is there anything urgent I can help with right now?`,
-        escalate: `${name}I hear you, and I'm truly sorry for the inconvenience. I'm connecting you with a human specialist right now who will give you the personal attention you deserve. Please hold on just a moment.`,
-        lookup_order: summary
-          ? `${name}here's what I found:\n\n${summary}\n\nWould you like me to help with anything else regarding this order?`
-          : `${name}I wasn't able to find an order with that number. Could you double-check it for me? You can also share the email address used for the order and I'll look it up that way.`,
-        default: `${name}thanks for your message! I'm here to help. Could you tell me a bit more about what you need? I can assist with orders, tickets, appointments, or just answer any questions you have.`,
+      const fallbacks: Record<string, { response: string; metadata: Record<string, any> | null }> = {
+        capture_lead: {
+          response: `${name}thank you for reaching out! I've saved your contact details and our team will get back to you within 24 hours. Is there anything else I can help with?`,
+          metadata: { type: 'confirmation', title: 'Contact Saved', options: [{ label: 'Ask Something Else', value: 'help' }, { label: 'Done', value: 'done' }] },
+        },
+        book_appointment: {
+          response: `${name}your appointment has been booked! You'll receive a calendar invite shortly. Anything else you'd like to schedule?`,
+          metadata: { type: 'confirmation', title: 'Appointment Booked', options: [{ label: 'Reschedule', value: 'reschedule' }, { label: 'Cancel', value: 'cancel' }] },
+        },
+        create_ticket: {
+          response: `${name}I've created your support ticket. Here are the details:\n\n${summary}\n\nOur team will follow up shortly. Is there anything urgent I can help with right now?`,
+          metadata: { type: 'confirmation', title: 'Ticket Created', options: [{ label: 'Check Status', value: 'check_status' }, { label: 'Close', value: 'done' }] },
+        },
+        escalate: {
+          response: `${name}I hear you, and I'm truly sorry for the inconvenience. I'm connecting you with a human specialist right now who will give you the personal attention you deserve. Please hold on just a moment.`,
+          metadata: { type: 'confirmation', title: 'Escalated to Human', options: [] },
+        },
+        lookup_order: {
+          response: summary
+            ? `${name}here's what I found:\n\n${summary}\n\nWould you like me to help with anything else regarding this order?`
+            : `${name}I wasn't able to find an order with that number. Could you double-check it for me?`,
+          metadata: summary
+            ? { type: 'choice', options: [{ label: 'Track Package', value: 'track' }, { label: 'Request Return', value: 'return' }, { label: 'Done', value: 'done' }] }
+            : null,
+        },
+        default: {
+          response: `${name}thanks for your message! I'm here to help. What would you like to do?`,
+          metadata: { type: 'quick_replies', options: [
+            { label: 'Create Ticket', value: 'I need to create a ticket' },
+            { label: 'Track Order', value: 'I want to check my order' },
+            { label: 'Book Appointment', value: 'I want to book an appointment' },
+            { label: 'Talk to Human', value: 'I want to talk to a human agent' }
+          ]},
+        },
       };
 
-      return { response: fallbacks[state.pendingAction || 'default'] || fallbacks.default };
+      const fb = fallbacks[state.pendingAction || 'default'] || fallbacks.default;
+      return { response: fb.response, responseMetadata: fb.metadata };
     }
   }
 
@@ -527,6 +579,7 @@ Examples of good responses:
       actionSummary: '',
       sentiment: 'neutral',
       response: '',
+      responseMetadata: null,
     });
 
     return {
@@ -536,6 +589,7 @@ Examples of good responses:
       customerInfo: result.customerInfo,
       actionSummary: result.actionSummary,
       sentiment: result.sentiment,
+      responseMetadata: result.responseMetadata,
     };
   }
 }
