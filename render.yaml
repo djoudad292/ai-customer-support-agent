@@ -20,3 +20,7 @@ services:
         sync: false
       - key: APP_URL
         value: https://ai-customer-support-backend-ldbf.onrender.com
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: LLM_MODEL
+        value: meta-llama/llama-3.1-8b-instruct
