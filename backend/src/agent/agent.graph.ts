@@ -31,6 +31,13 @@ export class AgentGraph {
   private logger = new Logger(AgentGraph.name);
   private graph: any;
 
+  constructor(
+    private config: ConfigService,
+    private prisma: PrismaService,
+  ) {
+    this.buildGraph();
+  }
+
   getCompiledGraph() {
     return this.graph;
   }
@@ -111,7 +118,7 @@ export class AgentGraph {
 
     const llm = new ChatGoogleGenerativeAI({
       apiKey: this.config.get<string>('GOOGLE_API_KEY'),
-      model: this.config.get<string>('LLM_MODEL', 'gemini-2.0-flash'),
+      model: this.config.get<string>('LLM_MODEL', 'gemini-1.5-flash'),
       maxOutputTokens: 1024,
     });
 
@@ -332,7 +339,7 @@ Respond with ONLY the action identifier (none, capture_lead, book_appointment, c
   private async respondNode(state: typeof AgentState.State) {
     const llm = new ChatGoogleGenerativeAI({
       apiKey: this.config.get<string>('GOOGLE_API_KEY'),
-      model: this.config.get<string>('LLM_MODEL', 'gemini-2.0-flash'),
+      model: this.config.get<string>('LLM_MODEL', 'gemini-1.5-flash'),
       maxOutputTokens: 2048,
     });
 
