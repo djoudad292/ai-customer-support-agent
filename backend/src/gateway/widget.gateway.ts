@@ -8,6 +8,7 @@ import {
   OnGatewayConnection,
   OnGatewayDisconnect,
 } from '@nestjs/websockets';
+import { IncomingMessage } from 'http';
 import { Server, WebSocket } from 'ws';
 import { AgentService } from '../agent/agent.service';
 import { PrismaService } from '../common/prisma.service';
@@ -34,9 +35,9 @@ export class WidgetGateway
     private prisma: PrismaService,
   ) {}
 
-  handleConnection(client: WidgetSocket) {
-    const baseUrl = 'ws://' + (client.url ? 'localhost' : 'localhost') + '/';
-    const url = new URL(client.url, baseUrl);
+  handleConnection(client: WidgetSocket, request?: IncomingMessage) {
+    const rawUrl = client.url || request?.url || '/';
+    const url = new URL(rawUrl, 'ws://localhost');
     const companyId = url.searchParams.get('company') || 'demo';
     client.companyId = companyId;
 
