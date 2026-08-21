@@ -34,12 +34,18 @@ const buttonSizes: Record<ButtonSize, string> = {
   lg: 'h-12 px-6 text-base min-h-[48px]',
 }
 
-export interface ButtonProps extends React.ComponentProps<'button'> {
+export interface ButtonProps {
   children?: React.ReactNode
   variant?: ButtonVariant
   size?: ButtonSize
   loading?: boolean
   fullWidth?: boolean
+  type?: 'button' | 'submit' | 'reset'
+  disabled?: boolean
+  onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void
+  className?: string
+  style?: React.CSSProperties
+  'aria-label'?: string
 }
 
 export function Button({
@@ -92,9 +98,23 @@ const fieldBase =
   'w-full rounded-xl bg-[var(--surface-alt)] border text-[15px] text-[var(--fg)] placeholder:text-[var(--fg-muted)] ' +
   'transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:border-transparent'
 
-export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+export interface InputProps {
   label?: string
   error?: string
+  id?: string
+  type?: string
+  value?: string | number
+  placeholder?: string
+  required?: boolean
+  disabled?: boolean
+  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void
+  onBlur?: (e: React.FocusEvent<HTMLInputElement>) => void
+  className?: string
+  autoFocus?: boolean
+  min?: string | number
+  max?: string | number
+  step?: string | number
+  name?: string
 }
 
 export function Input({ label, error, className = '', id, ...rest }: InputProps) {
@@ -124,9 +144,19 @@ export function Input({ label, error, className = '', id, ...rest }: InputProps)
   )
 }
 
-export interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
+export interface TextareaProps {
   label?: string
   error?: string
+  id?: string
+  rows?: number
+  value?: string | number
+  placeholder?: string
+  required?: boolean
+  disabled?: boolean
+  onChange?: (e: React.ChangeEvent<HTMLTextAreaElement>) => void
+  onBlur?: (e: React.FocusEvent<HTMLTextAreaElement>) => void
+  className?: string
+  name?: string
 }
 
 export function Textarea({ label, error, className = '', id, rows = 4, ...rest }: TextareaProps) {
