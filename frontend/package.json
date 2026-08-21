@@ -9,7 +9,6 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@supportai/ui": "file:../packages/ui",
     "clsx": "^2.1.0",
     "lucide-react": "^0.300.0",
     "next": "^14.2.0",
