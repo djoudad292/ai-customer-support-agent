@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
-import { Card, Badge, Button, Spinner, EmptyState, ErrorBanner } from "@supportai/ui";
+import { Card, Badge, Button, Spinner, EmptyState, ErrorBanner } from "@supportai/ui/web";
 
 interface Message {
   id: string;

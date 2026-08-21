@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { GitBranch, MessageSquare, Ticket, BookOpen, Settings, Package, ClipboardList, CalendarDays, Download } from "lucide-react";
-import { Card, CardHeader, CardTitle, Button, Badge, Spinner } from "@supportai/ui";
+import { Card, CardHeader, CardTitle, Button, Badge, Spinner } from "@supportai/ui/web";
 
 const APK_URL = "https://github.com/djoudad292/ai-customer-support-agent/releases/download/latest-apk/ai-customer-support.apk";
 

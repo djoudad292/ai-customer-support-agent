@@ -1,6 +1,9 @@
-import { Button, Logo } from "@supportai/ui";
-// ... (rest of imports)
-import { SidebarLink, Logo, Button } from "@supportai/ui";
+"use client";
+import { useRouter, usePathname } from "next/navigation";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { LayoutDashboard, MessageSquare, Ticket, Package, BookOpen, ClipboardList, CalendarDays, Settings, Menu, X, Download } from "lucide-react";
+import { SidebarLink, Logo, Button } from "@supportai/ui/web";
 
 const APK_URL = "https://github.com/djoudad292/ai-customer-support-agent/releases/download/latest-apk/ai-customer-support.apk";
 

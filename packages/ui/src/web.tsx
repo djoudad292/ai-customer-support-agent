@@ -34,7 +34,8 @@ const buttonSizes: Record<ButtonSize, string> = {
   lg: 'h-12 px-6 text-base min-h-[48px]',
 }
 
-export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+export interface ButtonProps extends React.ComponentProps<'button'> {
+  children?: React.ReactNode
   variant?: ButtonVariant
   size?: ButtonSize
   loading?: boolean

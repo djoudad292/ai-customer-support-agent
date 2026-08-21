@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { Bot, Ticket, Package, MessageSquare, ClipboardList, CalendarDays, BookOpen, BarChart3, Plug, Download, Smartphone, ArrowRight, Zap, Shield, Globe } from "lucide-react";
-import { Button, Card, Badge, Logo } from "@supportai/ui";
+import { Button, Card, Badge, Logo } from "@supportai/ui/web";
 
 const APK_URL = "https://github.com/djoudad292/ai-customer-support-agent/releases/download/latest-apk/ai-customer-support.apk";
 
@@ -135,7 +135,7 @@ export default function Home() {
               <span className="sm:hidden">APK</span>
             </a>
             <Link href="/login" className="text-xs sm:text-sm text-muted hover:text-fg transition-colors">Login</Link>
-            <Button asChild size="sm">
+            <Button size="sm">
               <Link href="/register">Get Started</Link>
             </Button>
           </div>

@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
-import { Card, CardHeader, CardTitle, Badge, Button, Modal, Input, Textarea, Spinner, EmptyState } from "@supportai/ui";
+import { Card, CardHeader, CardTitle, Badge, Button, Modal, Input, Textarea, Spinner, EmptyState } from "@supportai/ui/web";
 
 interface Ticket {
   id: string;

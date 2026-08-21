@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "../../lib/api";
 import { MessageSquare } from "lucide-react";
-import { Input, Button, ErrorBanner } from "@supportai/ui";
+import { Input, Button, ErrorBanner } from "@supportai/ui/web";
 
 export default function Register() {
   const router = useRouter();

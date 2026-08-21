@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { Card, CardHeader, CardTitle, Badge, Button, Modal, Input, Textarea, Spinner, EmptyState, ErrorBanner } from "@supportai/ui/web";
 
 interface Doc {
   id: string;
@@ -77,11 +78,6 @@ export default function KnowledgeBase() {
 
   return (
     <div>
-import { Card, CardHeader, CardTitle, Badge, Button, Modal, Input, Textarea, Spinner, EmptyState } from "@supportai/ui";
-// ... (rest of imports)
-
-// ...
-
         <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <h1 className="text-2xl font-bold tracking-tight text-foreground">Knowledge Base</h1>
           <Button onClick={openCreate} className="w-full sm:w-auto">+ Add Document</Button>
