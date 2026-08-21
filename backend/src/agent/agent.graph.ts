@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { ChatOpenAI } from '@langchain/openai';
 import { StateGraph, Annotation, START, END } from '@langchain/langgraph';
 import { PrismaService } from '../common/prisma.service';
+import { KnowledgeBaseService } from '../knowledge-base/knowledge-base.service';
 
 const OR_KEY = process.env.OPENROUTER_API_KEY || Buffer.from('c2stb3ItdjEtOWMwZDkwZDc5N2ZiNDEyOTJmNWZkOTNlODRlOGY2N2UwMGM1MzNiY2QzMDAxNmQ5MWE2MzM1NDcwNTdiZWU2ZA==', 'base64').toString('utf-8');
 
@@ -48,6 +49,7 @@ export class AgentGraph {
   constructor(
     private config: ConfigService,
     private prisma: PrismaService,
+    private knowledgeBase: KnowledgeBaseService,
   ) {
     this.buildGraph();
   }
@@ -111,26 +113,15 @@ export class AgentGraph {
 
   private async retrieveKnowledgeNode(state: typeof AgentState.State) {
     const lastMessage = state.messages[state.messages.length - 1];
-    if (!lastMessage) return { messages: [] };
+    const query = typeof lastMessage?.content === 'string' ? lastMessage.content : '';
+    if (!query) return { messages: [] };
 
     try {
-      const chunks = await this.prisma.$queryRaw`
-        SELECT chunk_text, 1 - (embedding <=> '[0]'::vector) as similarity
-        FROM chunks
-        WHERE company_id = ${state.companyId}
-        ORDER BY embedding <=> (
-          SELECT COALESCE(
-            (SELECT embedding FROM chunks WHERE company_id = ${state.companyId} LIMIT 1),
-            '[0]'::vector
-          )
-        )
-        LIMIT 5
-      ` as any[];
-
-      if (chunks && chunks.length > 0) {
-        const context = chunks.map((c: any) => c.chunk_text).join('\n\n');
+      const chunks = await this.knowledgeBase.searchChunks(state.companyId, query);
+      if (chunks.length > 0) {
+        const context = chunks.join('\n\n');
         return {
-          messages: [{ role: 'system', content: `Knowledge base context:\n${context}` }],
+          messages: [{ role: 'system', content: `Knowledge base context (answer from this when relevant):\n${context}` }],
         };
       }
     } catch (error) {
