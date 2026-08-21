@@ -115,6 +115,9 @@ export interface InputProps {
   max?: string | number
   step?: string | number
   name?: string
+  autoComplete?: string
+  minLength?: number
+  maxLength?: number
 }
 
 export function Input({ label, error, className = '', id, ...rest }: InputProps) {

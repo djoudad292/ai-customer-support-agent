@@ -1,6 +1,6 @@
 import { Stack, Redirect } from 'expo-router'
 import { useAuth } from '@/lib/auth-context'
-import { Colors } from '@/lib/theme'
+import { tokens } from '@supportai/ui'
 
 export default function DashboardLayout() {
   const { isAuthenticated, isLoading } = useAuth()
@@ -11,7 +11,7 @@ export default function DashboardLayout() {
     <Stack
       screenOptions={{
         headerShown: false,
-        contentStyle: { backgroundColor: Colors.background },
+        contentStyle: { backgroundColor: tokens.colors.bg },
       }}
     >
       <Stack.Screen name="(tabs)" />

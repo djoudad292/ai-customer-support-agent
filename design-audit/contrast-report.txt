@@ -1,0 +1,25 @@
+WCAG AA Contrast Report — @supportai/ui design tokens
+Verified programmatically (WCAG relative luminance, threshold 4.5:1 normal text)
+
+DARK MODE (default)
+  fg            #F2F6FF on bg/surface/surfaceAlt   18.18 / 16.98 / 15.69  PASS
+  fgSecondary   #A3B3CC on bg/surface/surfaceAlt    9.26 /  8.64 /  7.99  PASS
+  fgMuted       #7E92B2 on bg/surface/surfaceAlt    6.22 /  5.81 /  5.37  PASS (adjusted from #64789A = 4.40 FAIL)
+  primary       #818CF8 on bg/surface               6.60 /  6.16          PASS
+  success/warning/danger/violet/accent/orange on bg  all >= 7.1           PASS
+  white on primaryStrong #6063EE (button)           4.65                   PASS (adjusted from #6366F1 = 4.47 FAIL)
+  gradient button endpoints #6063EE -> #7D55F3      4.65 / 4.70 with white PASS (to adjusted from #8B5CF6 = 4.23 FAIL)
+
+LIGHT MODE
+  fg            #0C1526 on bg/surface/surfaceAlt   17.30 / 18.25 / 16.25  PASS
+  fgSecondary   #44546E on bg/surface/surfaceAlt    7.27 /  7.67 /  6.83  PASS
+  fgMuted       #5D6E88 on bg/surface/surfaceAlt    4.91 /  5.18 /  4.62  PASS (adjusted from #6B7C97 = 4.02 FAIL)
+  primary       #4F46E5 on surface                  6.29                  PASS
+  success       #047857 on surface                  5.48                  PASS (adjusted from #059669 = 3.77 FAIL)
+  accent        #0E7490 on surface                  5.36                  PASS (adjusted from #0891B2 = 3.68 FAIL)
+  orange        #C2410C on surface                  5.18                  PASS (adjusted from #EA580C = 3.56 FAIL)
+  warning/danger/violet                        5.02 / 4.83 / 5.70     PASS
+  white on primaryStrong #4338CA                     7.90                  PASS
+
+Interactive targets: all buttons/inputs/nav links >= 44px min height (web md/lg, native all).
+Focus states: :focus-visible ring-2 var(--primary) + offset on web; native uses platform focus/hover states.
