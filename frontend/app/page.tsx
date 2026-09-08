@@ -1,8 +1,6 @@
 "use client";
 import Link from "next/link";
-import { Suspense } from "react";
 import { Bot, Ticket, Package, MessageSquare, ClipboardList, CalendarDays, BookOpen, BarChart3, Plug, Download, Smartphone, ArrowRight, Zap, Shield, Globe } from "lucide-react";
-import { DemoChat } from "@/components/demo-chat";
 
 const APK_URL = "https://github.com/djoudad292/ai-customer-support-agent/releases/download/latest-apk/ai-customer-support.apk";
 
@@ -288,10 +286,6 @@ export default function Home() {
       <footer className="border-t border-slate-800 px-3 py-6 sm:px-6 sm:py-8 text-center text-xs sm:text-sm text-slate-500">
         AI Customer Support Agent — Built with Next.js, LangGraph &amp; Prisma
       </footer>
-
-      <Suspense fallback={null}>
-        <DemoChat />
-      </Suspense>
     </div>
   );
 }
