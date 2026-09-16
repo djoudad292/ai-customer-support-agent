@@ -42,6 +42,7 @@ export default function PriorAuthDemo() {
   const [activeCase, setActiveCase] = useState(CASES[0]);
   const [answer, setAnswer] = useState("");
   const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState("");
   const [decision, setDecision] = useState<string | null>(null);
   const [audit, setAudit] = useState<AuditEntry[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
@@ -70,33 +71,60 @@ export default function PriorAuthDemo() {
     setLoading(true);
     setAnswer("");
     setDecision(null);
+    setStatus("");
     log(`Check started for case: ${activeCase.title}`);
-    try {
-      const ws = await ensureWs();
-      const reply = await new Promise<string>((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error("timeout")), 90000);
-        ws.onmessage = (e) => {
-          try {
-            const d = JSON.parse(e.data);
-            if (d.type === "connected" && d.conversationId) convRef.current = d.conversationId;
-            if (d.type === "message") {
-              clearTimeout(timer);
-              resolve(d.content);
+    // Free-tier backend sleeps when idle: first hit often fails or crawls.
+    // Retry with backoff instead of one silent 90s hang.
+    const waits = [0, 5000, 15000];
+    for (let attempt = 0; attempt < waits.length; attempt++) {
+      if (attempt > 0) {
+        setStatus(`Backend warming up — retry ${attempt} of ${waits.length - 1}…`);
+        log(`Retry ${attempt}: waiting ${waits[attempt] / 1000}s for cold backend`);
+        await new Promise((r) => setTimeout(r, waits[attempt]));
+      } else {
+        setStatus("Connecting to evaluation backend…");
+      }
+      try {
+        const ws = await ensureWs();
+        setStatus("Agent reading criteria documents…");
+        const { content, cited } = await new Promise<{ content: string; cited: boolean }>((resolve, reject) => {
+          const timer = setTimeout(() => reject(new Error("timeout")), 60000);
+          ws.onmessage = (e) => {
+            try {
+              const d = JSON.parse(e.data);
+              if (d.type === "connected" && d.conversationId) convRef.current = d.conversationId;
+              if (d.type === "error") {
+                clearTimeout(timer);
+                reject(new Error("backend-error"));
+              }
+              if (d.type === "message") {
+                clearTimeout(timer);
+                resolve({ content: d.content, cited: !!d.cited });
+              }
+            } catch {
+              /* ignore malformed frames */
             }
-          } catch {
-            /* ignore */
-          }
-        };
-        ws.send(JSON.stringify({ event: "chat", data: { message: activeCase.prompt, conversationId: convRef.current, companyId: COMPANY_ID } }));
-      });
-      setAnswer(reply);
-      log("Agent returned cited evaluation");
-    } catch {
-      setAnswer("The evaluation backend did not respond in time (free-tier hosting sleeps when idle). The criteria documents and review flow below still show exactly how the walkthrough works — retry in a minute, or book a live call and I will run it with you.");
-      log("Backend timeout — asked visitor to retry or book live run");
-    } finally {
-      setLoading(false);
+          };
+          ws.send(JSON.stringify({ event: "chat", data: { message: activeCase.prompt, conversationId: convRef.current, companyId: COMPANY_ID } }));
+        });
+        setAnswer(content);
+        // Honest audit: only claim a *cited* evaluation when the backend
+        // flagged citations. A citation-less answer is a draft, not a decision.
+        if (cited) log("Agent returned cited evaluation");
+        else log("Agent answered without citations — treat as draft, not a decision");
+        setStatus("");
+        setLoading(false);
+        return;
+      } catch (err) {
+        log(`Attempt ${attempt + 1} failed (${err instanceof Error ? err.message : "unknown"})`);
+        try { wsRef.current?.close(); } catch { /* ignore */ }
+        wsRef.current = null;
+      }
     }
+    setAnswer("The evaluation backend did not respond after 3 attempts (free-tier hosting sleeps when idle, or all LLM providers errored). The criteria documents and review flow below still show exactly how the walkthrough works — retry in a minute, or book a live call and I will run it with you.");
+    log("Backend unavailable after 3 attempts — asked visitor to retry or book live run");
+    setStatus("");
+    setLoading(false);
   }
 
   function decide(kind: "approved" | "human-review" | "denied") {
@@ -148,6 +176,7 @@ export default function PriorAuthDemo() {
             >
               {loading ? "Checking against criteria…" : "2 · Check against criteria"}
             </button>
+            {status && <p className="mt-2 text-center text-[12px] text-slate-400">{status}</p>}
           </div>
 
           <div>

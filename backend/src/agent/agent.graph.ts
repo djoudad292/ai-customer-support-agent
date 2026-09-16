@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ChatOpenAI } from '@langchain/openai';
+import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { StateGraph, Annotation, START, END } from '@langchain/langgraph';
 import { PrismaService } from '../common/prisma.service';
 import { KnowledgeBaseService } from '../knowledge-base/knowledge-base.service';
@@ -56,6 +57,46 @@ export class AgentGraph {
 
   getCompiledGraph() {
     return this.graph;
+  }
+
+  /**
+   * Invoke an LLM with provider failover. OpenRouter (primary) has been
+   * observed returning transient 401s that made every chat input fall back
+   * to a fake greeting — hence failover to Gemini, then a loud typed error.
+   * NEVER return canned user-facing copy from here: callers decide how to
+   * surface LLM_UNAVAILABLE so the UI can retry honestly.
+   */
+  private async invokeLlm(
+    messages: { role: string; content: string }[],
+    opts: { maxTokens: number; temperature: number },
+  ): Promise<string> {
+    const modelName = this.config.get<string>('LLM_MODEL', 'meta-llama/llama-3.1-8b-instruct');
+    try {
+      const primary = new ChatOpenAI({
+        apiKey: OR_KEY,
+        modelName,
+        maxTokens: opts.maxTokens,
+        temperature: opts.temperature,
+        configuration: { baseURL: 'https://openrouter.ai/api/v1' },
+      });
+      const result = await primary.invoke(messages as any);
+      return result.content.toString();
+    } catch (primaryErr) {
+      this.logger.warn(`Primary LLM (${modelName}) failed, failing over to Gemini: ${primaryErr}`);
+    }
+    try {
+      const fallback = new ChatGoogleGenerativeAI({
+        apiKey: process.env.GOOGLE_API_KEY,
+        model: 'gemini-2.0-flash',
+        maxOutputTokens: opts.maxTokens,
+        temperature: opts.temperature,
+      });
+      const result = await fallback.invoke(messages as any);
+      return result.content.toString();
+    } catch (fallbackErr) {
+      this.logger.error(`All LLM providers failed: ${fallbackErr}`);
+      throw new Error('LLM_UNAVAILABLE');
+    }
   }
 
   private buildGraph() {
@@ -135,16 +176,6 @@ export class AgentGraph {
     const lastMessage = state.messages[state.messages.length - 1];
     if (!lastMessage) return { pendingAction: null };
 
-    const llm = new ChatOpenAI({
-      apiKey: OR_KEY,
-      modelName: this.config.get<string>('LLM_MODEL', 'meta-llama/llama-3.1-8b-instruct'),
-      maxTokens: 256,
-      temperature: 0,
-      configuration: {
-        baseURL: 'https://openrouter.ai/api/v1',
-      },
-    });
-
     const conversationHistory = state.messages
       .filter((m) => m.role !== 'system')
       .slice(-10)
@@ -172,11 +203,12 @@ Customer: ${lastMessage.content}
 Reply with ONLY the action identifier (none, capture_lead, book_appointment, create_ticket, lookup_order, escalate):`;
 
     try {
-      const result = await llm.invoke([
-        { role: 'user', content: systemPrompt },
-      ]);
+      const content = await this.invokeLlm([{ role: 'user', content: systemPrompt }], {
+        maxTokens: 256,
+        temperature: 0,
+      });
 
-      const action = result.content.toString().trim().toLowerCase().replace(/[^a-z_]/g, '');
+      const action = content.trim().toLowerCase().replace(/[^a-z_]/g, '');
       const validActions = ['capture_lead', 'book_appointment', 'create_ticket', 'lookup_order', 'escalate'];
 
       if (validActions.includes(action)) {
@@ -440,16 +472,6 @@ Reply with ONLY the action identifier (none, capture_lead, book_appointment, cre
   }
 
   private async respondNode(state: typeof AgentState.State) {
-    const llm = new ChatOpenAI({
-      apiKey: OR_KEY,
-      modelName: this.config.get<string>('LLM_MODEL', 'meta-llama/llama-3.1-8b-instruct'),
-      maxTokens: 1024,
-      temperature: 0.7,
-      configuration: {
-        baseURL: 'https://openrouter.ai/api/v1',
-      },
-    });
-
     const actionContext = state.actionSummary ? `\n\nACTION TAKEN: ${state.actionSummary}` : '';
     const customerName = state.customerInfo?.name ? ` (Customer name: ${state.customerInfo.name})` : '';
     const sentimentNote = state.sentiment === 'negative'
@@ -483,8 +505,10 @@ Examples of good responses:
     };
 
     try {
-      const result = await llm.invoke([systemPrompt, ...conversationHistory]);
-      const responseContent = result.content.toString();
+      const responseContent = await this.invokeLlm([systemPrompt, ...conversationHistory], {
+        maxTokens: 1024,
+        temperature: 0.7,
+      });
 
       let metadata: Record<string, any> | null = null;
       if (state.pendingAction === 'create_ticket') {
@@ -508,49 +532,11 @@ Examples of good responses:
 
       return { response: responseContent, responseMetadata: metadata };
     } catch (error) {
+      // Fail loudly: a canned greeting here once posed as a "cited evaluation"
+      // on the prior-auth demo and burned a live buyer conversation. The
+      // gateway translates this into a typed error the UI retries honestly.
       this.logger.error(`Respond node failed: ${error}`);
-
-      const name = state.customerInfo?.name ? `${state.customerInfo.name}, ` : '';
-      const summary = state.actionSummary || '';
-
-      const fallbacks: Record<string, { response: string; metadata: Record<string, any> | null }> = {
-        capture_lead: {
-          response: `${name}thank you for reaching out! I've saved your contact details and our team will get back to you within 24 hours. Is there anything else I can help with?`,
-          metadata: { type: 'confirmation', title: 'Contact Saved', options: [{ label: 'Ask Something Else', value: 'help' }, { label: 'Done', value: 'done' }] },
-        },
-        book_appointment: {
-          response: `${name}your appointment has been booked! You'll receive a calendar invite shortly. Anything else you'd like to schedule?`,
-          metadata: { type: 'confirmation', title: 'Appointment Booked', options: [{ label: 'Reschedule', value: 'reschedule' }, { label: 'Cancel', value: 'cancel' }] },
-        },
-        create_ticket: {
-          response: `${name}I've created your support ticket. Here are the details:\n\n${summary}\n\nOur team will follow up shortly. Is there anything urgent I can help with right now?`,
-          metadata: { type: 'confirmation', title: 'Ticket Created', options: [{ label: 'Check Status', value: 'check_status' }, { label: 'Close', value: 'done' }] },
-        },
-        escalate: {
-          response: `${name}I hear you, and I'm truly sorry for the inconvenience. I'm connecting you with a human specialist right now who will give you the personal attention you deserve. Please hold on just a moment.`,
-          metadata: { type: 'confirmation', title: 'Escalated to Human', options: [] },
-        },
-        lookup_order: {
-          response: summary
-            ? `${name}here's what I found:\n\n${summary}\n\nWould you like me to help with anything else regarding this order?`
-            : `${name}I wasn't able to find an order with that number. Could you double-check it for me?`,
-          metadata: summary
-            ? { type: 'choice', options: [{ label: 'Track Package', value: 'track' }, { label: 'Request Return', value: 'return' }, { label: 'Done', value: 'done' }] }
-            : null,
-        },
-        default: {
-          response: `${name}thanks for your message! I'm here to help. What would you like to do?`,
-          metadata: { type: 'quick_replies', options: [
-            { label: 'Create Ticket', value: 'I need to create a ticket' },
-            { label: 'Track Order', value: 'I want to check my order' },
-            { label: 'Book Appointment', value: 'I want to book an appointment' },
-            { label: 'Talk to Human', value: 'I want to talk to a human agent' }
-          ]},
-        },
-      };
-
-      const fb = fallbacks[state.pendingAction || 'default'] || fallbacks.default;
-      return { response: fb.response, responseMetadata: fb.metadata };
+      throw new Error('LLM_UNAVAILABLE');
     }
   }
 

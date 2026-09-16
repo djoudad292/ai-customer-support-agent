@@ -83,12 +83,17 @@ export class WidgetGateway
         message,
       );
 
+      // Cited = response references sourced rules (criterion/page/section markers).
+      // The prior-auth demo only logs "cited evaluation" when this is true.
+      const cited = /(criteri|§\s*|page\s+\d|section\s+[a-z]|[MBR]-\d)/i.test(result.response || '');
+
       client.send(
         JSON.stringify({
           type: 'message',
           conversationId: result.conversationId,
           content: result.response,
           action: result.action || null,
+          cited,
         }),
       );
     } catch (err) {
