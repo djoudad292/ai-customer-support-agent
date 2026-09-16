@@ -66,6 +66,13 @@ export class AgentGraph {
    * NEVER return canned user-facing copy from here: callers decide how to
    * surface LLM_UNAVAILABLE so the UI can retry honestly.
    */
+  private withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+    return Promise.race([
+      p,
+      new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`${label}_TIMEOUT_${ms}ms`)), ms)),
+    ]);
+  }
+
   private async invokeLlm(
     messages: { role: string; content: string }[],
     opts: { maxTokens: number; temperature: number },
@@ -79,7 +86,7 @@ export class AgentGraph {
         temperature: opts.temperature,
         configuration: { baseURL: 'https://openrouter.ai/api/v1' },
       });
-      const result = await primary.invoke(messages as any);
+      const result = await this.withTimeout(primary.invoke(messages as any), 25000, 'openrouter');
       return result.content.toString();
     } catch (primaryErr) {
       this.logger.warn(`Primary LLM (${modelName}) failed, failing over to Gemini: ${primaryErr}`);
@@ -91,7 +98,7 @@ export class AgentGraph {
         maxOutputTokens: opts.maxTokens,
         temperature: opts.temperature,
       });
-      const result = await fallback.invoke(messages as any);
+      const result = await this.withTimeout(fallback.invoke(messages as any), 45000, 'gemini');
       return result.content.toString();
     } catch (fallbackErr) {
       this.logger.error(`All LLM providers failed: ${fallbackErr}`);
