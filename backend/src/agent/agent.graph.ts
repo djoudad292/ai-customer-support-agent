@@ -6,7 +6,7 @@ import { StateGraph, Annotation, START, END } from '@langchain/langgraph';
 import { PrismaService } from '../common/prisma.service';
 import { KnowledgeBaseService } from '../knowledge-base/knowledge-base.service';
 
-const OR_KEY = process.env.OPENROUTER_API_KEY || Buffer.from('c2stb3ItdjEtOWMwZDkwZDc5N2ZiNDEyOTJmNWZkOTNlODRlOGY2N2UwMGM1MzNiY2QzMDAxNmQ5MWE2MzM1NDcwNTdiZWU2ZA==', 'base64').toString('utf-8');
+const OR_KEY = process.env.OPENROUTER_API_KEY || '';
 
 export const AgentState = Annotation.Root({
   messages: Annotation<{ role: string; content: string }[]>({
@@ -73,12 +73,13 @@ export class AgentGraph {
     ]);
   }
 
-  private async invokeLlm(
+  async invokeLlm(
     messages: { role: string; content: string }[],
     opts: { maxTokens: number; temperature: number },
   ): Promise<string> {
     const modelName = this.config.get<string>('LLM_MODEL', 'meta-llama/llama-3.1-8b-instruct');
-    try {
+    if (!OR_KEY) this.logger.warn('OPENROUTER_API_KEY missing — primary provider skipped');
+    if (OR_KEY) try {
       const primary = new ChatOpenAI({
         apiKey: OR_KEY,
         modelName,

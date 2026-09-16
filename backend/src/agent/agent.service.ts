@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { AgentGraph } from './agent.graph';
+import { KnowledgeBaseService } from '../knowledge-base/knowledge-base.service';
 
 @Injectable()
 export class AgentService {
@@ -11,6 +12,7 @@ export class AgentService {
   constructor(
     private prisma: PrismaService,
     private agentGraph: AgentGraph,
+    private knowledgeBase: KnowledgeBaseService,
   ) {}
 
   getTrace() {
@@ -46,6 +48,24 @@ export class AgentService {
         content: message,
       },
     });
+
+    // Fast path: prior-auth style evaluation prompts go straight to a single
+    // cited RAG call (temp 0) instead of the generic support graph. This skips
+    // a full LLM router round-trip (~20-30s) and guarantees citation-shaped
+    // output instead of conversational chatter.
+    if (/evaluate\b.*\bcriteria/i.test(message)) {
+      const response = await this.evaluateWithCitations(companyId, message);
+      await this.prisma.message.create({
+        data: {
+          id: crypto.randomUUID(),
+          conversationId,
+          senderType: 'agent',
+          senderId: 'ai-agent',
+          content: response,
+        },
+      });
+      return { conversationId, response, action: null, trace: this.trace, metadata: null };
+    }
 
     const history = conversation?.messages.map((m) => ({
       role: m.senderType === 'customer' ? 'human' : 'ai',
@@ -105,5 +125,38 @@ export class AgentService {
       trace: this.trace,
       metadata: result.responseMetadata,
     };
+  }
+
+  /**
+   * Single-call cited evaluation over the company knowledge base.
+   * Throws NO_CRITERIA when nothing relevant is stored (honest failure),
+   * or LLM_UNAVAILABLE when all providers fail — never a fake answer.
+   */
+  private async evaluateWithCitations(companyId: string, request: string): Promise<string> {
+    const chunks = await this.knowledgeBase.searchChunks(companyId, request);
+    if (!chunks.length) {
+      throw new Error('NO_CRITERIA');
+    }
+    const prompt = `You are a prior-authorization clinical review assistant working with SAMPLE evaluation data (not medical advice).
+Use ONLY the criteria below. Cite every rule you apply as [Criterion X-N] with its page/section.
+If the request lacks information a criterion needs, state exactly what is missing and route to the exception queue / human review. Never invent criteria.
+
+CRITERIA:
+${chunks.join('\n\n')}
+
+REQUEST:
+${request}
+
+Respond in exactly this shape:
+1) Recommendation: APPROVE / NEEDS MORE INFO / FLAG FOR HUMAN REVIEW (one line)
+2) Criteria applied: each with [Criterion X-N] + page/section
+3) Missing: list, or "None"`;
+    return this.agentGraph.invokeLlm(
+      [
+        { role: 'system', content: 'You evaluate prior-authorization requests against supplied sample criteria, with citations.' },
+        { role: 'user', content: prompt },
+      ],
+      { maxTokens: 1024, temperature: 0 },
+    );
   }
 }

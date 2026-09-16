@@ -97,13 +97,14 @@ export class WidgetGateway
         }),
       );
     } catch (err) {
-      this.logger.error(`Widget chat failed: ${(err as Error).message}`);
-      client.send(
-        JSON.stringify({
-          type: 'error',
-          content: 'Sorry, something went wrong. Please try again.',
-        }),
-      );
+      const code = (err as Error).message || '';
+      this.logger.error(`Widget chat failed: ${code}`);
+      // Distinct honest errors (frontend retries on these) instead of one
+      // generic message that hides whether it is data or provider failure.
+      const content = code.includes('NO_CRITERIA')
+        ? 'No criteria documents are loaded for this evaluation yet. Please retry in a minute or book a live run.'
+        : 'Sorry, something went wrong. Please try again.';
+      client.send(JSON.stringify({ type: 'error', content, code }));
     }
   }
 }
