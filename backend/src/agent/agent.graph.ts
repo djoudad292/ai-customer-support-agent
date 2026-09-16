@@ -487,13 +487,25 @@ Reply with ONLY the action identifier (none, capture_lead, book_appointment, cre
       ? '\nThe customer is in a good mood. Match their energy and be warm.'
       : '';
 
-    const conversationHistory = state.messages
-      .slice(-20)
-      .map((m) => ({ role: m.role as 'user' | 'assistant' | 'system', content: m.content }));
+    // Gemini (and strict OpenAI-compatible providers) require system messages
+    // first — but retrieveKnowledge appends KB context AFTER the human message.
+    // Fold KB context into the main system prompt and normalize human/ai roles.
+    const recentHistory = state.messages.slice(-20);
+    const kbContext = recentHistory
+      .filter((m) => m.role === 'system')
+      .map((m) => m.content)
+      .join('\n\n');
+    const conversationHistory = recentHistory
+      .filter((m) => m.role !== 'system')
+      .map((m) => ({
+        role: (m.role === 'ai' ? 'assistant' : 'user') as 'user' | 'assistant',
+        content: m.content,
+      }));
 
     const systemPrompt = {
       role: 'system' as const,
       content: `You are a warm, friendly, and professional AI customer support agent${customerName}. You are having a natural conversation.
+${kbContext ? `\nKNOWLEDGE BASE CONTEXT (answer from this when relevant):\n${kbContext}` : ''}
 
 RULES:
 - Be conversational, not robotic. Vary your greetings and closings.
