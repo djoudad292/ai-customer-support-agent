@@ -78,6 +78,7 @@ export class AgentGraph {
     opts: { maxTokens: number; temperature: number },
   ): Promise<string> {
     const modelName = this.config.get<string>('LLM_MODEL', 'meta-llama/llama-3.1-8b-instruct');
+    let primaryErr: unknown = new Error('skipped (no key)');
     if (!OR_KEY) this.logger.warn('OPENROUTER_API_KEY missing — primary provider skipped');
     if (OR_KEY) try {
       const primary = new ChatOpenAI({
@@ -89,8 +90,9 @@ export class AgentGraph {
       });
       const result = await this.withTimeout(primary.invoke(messages as any), 25000, 'openrouter');
       return result.content.toString();
-    } catch (primaryErr) {
-      this.logger.warn(`Primary LLM (${modelName}) failed, failing over to Gemini: ${primaryErr}`);
+    } catch (e) {
+      primaryErr = e;
+      this.logger.warn(`Primary LLM (${modelName}) failed, failing over to Gemini: ${e}`);
     }
     try {
       const fallback = new ChatGoogleGenerativeAI({
@@ -103,7 +105,8 @@ export class AgentGraph {
       return result.content.toString();
     } catch (fallbackErr) {
       this.logger.error(`All LLM providers failed: ${fallbackErr}`);
-      throw new Error('LLM_UNAVAILABLE');
+      const short = (e: unknown) => String(e).slice(0, 160).replace(/\s+/g, ' ');
+      throw new Error(`LLM_UNAVAILABLE primary=[${short(primaryErr)}] fallback=[${short(fallbackErr)}]`);
     }
   }
 
