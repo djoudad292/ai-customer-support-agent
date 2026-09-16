@@ -127,25 +127,6 @@ export class AgentService {
     };
   }
 
-  /** TEMPORARY: server-side LLM probe. Remove after verification. */
-  async probeLlm() {
-    const out: any = { model: null, openrouter: null, gemini: [] };
-    try {
-      out.model = (this.agentGraph as any).config?.get?.('LLM_MODEL', 'default?') ?? 'n/a';
-    } catch { out.model = 'n/a'; }
-    const t0 = Date.now();
-    try {
-      const r = await (this.agentGraph as any).invokeLlm(
-        [{ role: 'user', content: 'Say OK' }],
-        { maxTokens: 16, temperature: 0 },
-      );
-      out.openrouter = { ok: true, ms: Date.now() - t0, reply: String(r).slice(0, 80) };
-    } catch (e) {
-      out.openrouter = { ok: false, ms: Date.now() - t0, err: String(e).slice(0, 300) };
-    }
-    return out;
-  }
-
   /**
    * Single-call cited evaluation over the company knowledge base.
    * Throws NO_CRITERIA when nothing relevant is stored (honest failure),

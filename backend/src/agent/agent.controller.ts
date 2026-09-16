@@ -23,11 +23,4 @@ export class AgentController {
   async getTrace() {
     return this.agentService.getTrace();
   }
-
-  // TEMPORARY diagnostic probe (remove after prior-auth verification).
-  @Get('probe-llm')
-  @ApiOperation({ summary: 'Probe LLM providers (temporary)' })
-  async probeLlm() {
-    return this.agentService.probeLlm();
-  }
 }
