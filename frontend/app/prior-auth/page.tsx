@@ -3,7 +3,9 @@
 import { useState, useRef, useEffect } from "react";
 import { ShieldCheck, FileText, UserCheck, AlertTriangle, CheckCircle2, XCircle, Clock, Stethoscope } from "lucide-react";
 
-const COMPANY_ID = "85a535c5-2a12-4cef-977e-29f436bbb3f5";
+// Seeded tenant holding the SAMPLE MRI/biologic/referral criteria docs
+// (backend/prisma/seed-prior-auth.ts). Old id 85a535c5-… had an empty KB.
+const COMPANY_ID = "d92ae4ed-c4fc-4fdc-9aa6-8dbc49e54bdc";
 const WS_URL = "wss://ai-customer-support-backend-ldbf.onrender.com/ws?company=" + COMPANY_ID;
 
 const CASES = [

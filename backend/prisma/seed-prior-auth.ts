@@ -10,9 +10,9 @@
 import { PrismaClient } from '@prisma/client';
 import crypto from 'crypto';
 
-const COMPANY_ID = '85a535c5-2a12-4cef-977e-29f436bbb3f5';
+export const COMPANY_ID = '85a535c5-2a12-4cef-977e-29f436bbb3f5';
 
-const DOCS: { title: string; content: string }[] = [
+export const DOCS: { title: string; content: string }[] = [
   {
     title: 'SAMPLE: MRI Lumbar Spine Criteria (evaluation only)',
     content: `SAMPLE CRITERIA — MRI LUMBAR SPINE WITHOUT CONTRAST (evaluation only, not medical advice).
@@ -101,7 +101,9 @@ async function main() {
   }
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
+}
