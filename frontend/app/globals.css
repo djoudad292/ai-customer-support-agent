@@ -104,3 +104,28 @@
     border-radius: 8px;
   }
 }
+
+/*
+ * Public surface (.pub) — a paper/ink palette for the marketing page and the
+ * no-login demo, deliberately different from the dark product dashboard.
+ * Unlayered on purpose: it outranks the base layer without !important.
+ */
+.pub {
+  --pub-bg: #faf9f6;
+  --pub-panel: #ffffff;
+  --pub-line: #e5e1d8;
+  --pub-line-strong: #cdc7ba;
+  --pub-ink: #1a1917;
+  --pub-ink-2: #4c4a45;
+  --pub-ink-3: #7f7a71;
+  --pub-accent: #1d5c4a;
+  --primary: var(--pub-accent);
+  background-color: var(--pub-bg);
+  color: var(--pub-ink);
+  color-scheme: light;
+}
+
+.pub ::selection {
+  background: rgba(29, 92, 74, 0.14);
+  color: var(--pub-ink);
+}

@@ -11,10 +11,10 @@ import {
 import { IncomingMessage } from 'http';
 import { Server, WebSocket } from 'ws';
 import { AgentService } from '../agent/agent.service';
-import { PrismaService } from '../common/prisma.service';
 
 interface WidgetSocket extends WebSocket {
   companyId?: string;
+  conversationId?: string;
 }
 
 @Injectable()
@@ -30,16 +30,14 @@ export class WidgetGateway
 
   private logger = new Logger(WidgetGateway.name);
 
-  constructor(
-    private agentService: AgentService,
-    private prisma: PrismaService,
-  ) {}
+  constructor(private agentService: AgentService) {}
 
   handleConnection(client: WidgetSocket, request?: IncomingMessage) {
     const rawUrl = client.url || request?.url || '/';
     const url = new URL(rawUrl, 'ws://localhost');
     const companyId = url.searchParams.get('company') || 'demo';
     client.companyId = companyId;
+    client.conversationId = undefined;
 
     client.send(
       JSON.stringify({
@@ -52,6 +50,7 @@ export class WidgetGateway
 
   handleDisconnect(client: WidgetSocket) {
     client.companyId = undefined;
+    client.conversationId = undefined;
   }
 
   @SubscribeMessage('chat')
@@ -68,20 +67,22 @@ export class WidgetGateway
       return;
     }
 
-    let conversationId = data.conversationId || null;
-    try {
-      if (conversationId) {
-        const conv = await this.prisma.conversation.findUnique({
-          where: { id: conversationId },
-        });
-        if (!conv || conv.companyId !== companyId) conversationId = null;
-      }
+    // Guest isolation: a socket may only continue the conversation it created.
+    // A client-supplied id is never trusted on its own — otherwise a leaked
+    // conversationId would let a visitor append to (or read back) someone
+    // else's thread inside the same company workspace.
+    const conversationId =
+      data.conversationId && data.conversationId === client.conversationId
+        ? data.conversationId
+        : undefined;
 
+    try {
       const result = await this.agentService.chat(
         companyId,
         conversationId || crypto.randomUUID(),
         message,
       );
+      client.conversationId = result.conversationId;
 
       // Cited = response references sourced rules (criterion/page/section markers).
       // The prior-auth demo only logs "cited evaluation" when this is true.
