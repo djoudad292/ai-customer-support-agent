@@ -105,7 +105,7 @@ export default function Home() {
               Live demo &middot; no account needed
             </p>
             <h1 className="mt-3 text-[28px] font-semibold leading-[1.15] tracking-tight text-[var(--pub-ink)] sm:text-[40px]">
-              Customer support that answers, files the ticket, and calls a human when it can&rsquo;s.
+              Customer support that answers, files the ticket, and calls a human when it can&rsquo;t.
             </h1>
             <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-[var(--pub-ink-2)]">
               SupportAI runs the help desk. It answers from your documents, opens
