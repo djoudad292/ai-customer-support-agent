@@ -10,7 +10,22 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   }
 
   async onModuleInit() {
-    await this.$connect();
+    // Render free tier sleeps the instance AND the Postgres cluster; waking the
+    // app a few seconds before the DB is ready used to hard-crash boot into a
+    // restart loop. Retry briefly instead — bad credentials still fail fast.
+    const maxAttempts = 10;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        await this.$connect();
+        return;
+      } catch (err) {
+        if (attempt === maxAttempts) throw err;
+        console.warn(
+          `[Prisma] database not ready (attempt ${attempt}/${maxAttempts}), retrying in 4s`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, 4000));
+      }
+    }
   }
 
   async onModuleDestroy() {
