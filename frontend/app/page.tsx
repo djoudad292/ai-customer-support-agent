@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { API_BASE } from "../lib/api";
-import { DemoChatSlot } from "../components/demo-chat-slot";
 
 const PORTFOLIO_URL = "https://djaouad.is-a.dev";
 const APK_URL =
@@ -40,12 +39,6 @@ const steps: [string, string][] = [
   ["Watch it work", "Every conversation, ticket and lead lands in the dashboard with the full transcript."],
 ];
 
-const tryThese = [
-  "I need a refund for order #1234",
-  "book me a call on Friday morning",
-  "escalate this to a human agent",
-];
-
 export default function Home() {
   return (
     <div className="pub min-h-screen">
@@ -76,12 +69,12 @@ export default function Home() {
             </span>
           </div>
           <div className="flex items-center gap-1.5 sm:gap-3">
-            <a
-              href="#try"
-              className="hidden px-2 py-2 text-[13px] text-[var(--pub-ink-2)] hover:text-[var(--pub-ink)] sm:inline"
+            <Link
+              href="/try"
+              className="px-2 py-2 text-[13px] text-[var(--pub-ink-2)] hover:text-[var(--pub-ink)]"
             >
-              Live demo
-            </a>
+              Try it
+            </Link>
             <a
               href="#embed"
               className="hidden px-2 py-2 text-[13px] text-[var(--pub-ink-2)] hover:text-[var(--pub-ink)] sm:inline"
@@ -96,7 +89,7 @@ export default function Home() {
             </Link>
             <Link
               href="/register"
-              className="rounded-md bg-[var(--pub-ink)] px-3 py-2 text-[13px] font-medium text-[var(--pub-panel)] hover:bg-[#2e2c28]"
+              className="rounded-md border border-[var(--pub-line-strong)] px-3 py-2 text-[13px] font-medium text-[var(--pub-ink)] hover:bg-[var(--pub-panel)]"
             >
               Create account
             </Link>
@@ -105,57 +98,42 @@ export default function Home() {
       </header>
 
       <main>
-        {/* Demo */}
-        <section id="try" className="scroll-mt-16 border-b border-[var(--pub-line)]">
-          <div className="mx-auto grid max-w-5xl gap-10 px-4 py-10 sm:px-6 sm:py-14 lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-14">
-            <div className="order-2 lg:order-1 lg:pt-4">
-              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--pub-accent)]">
-                Live demo &middot; no account needed
-              </p>
-              <h1 className="mt-3 text-[28px] font-semibold leading-[1.15] tracking-tight text-[var(--pub-ink)] sm:text-[40px]">
-                Customer support that answers, files the ticket, and calls a human when it can&rsquo;t.
-              </h1>
-              <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-[var(--pub-ink-2)]">
-                SupportAI runs the help desk. It answers from your documents, opens
-                tickets, checks orders, captures leads, and hands the conversation to
-                a person when the answer needs judgement. The chat is the real agent,
-                running now — type into it.
-              </p>
+        {/* Hero */}
+        <section className="border-b border-[var(--pub-line)]">
+          <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 sm:py-14">
+            <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--pub-accent)]">
+              Live demo &middot; no account needed
+            </p>
+            <h1 className="mt-3 text-[28px] font-semibold leading-[1.15] tracking-tight text-[var(--pub-ink)] sm:text-[40px]">
+              Customer support that answers, files the ticket, and calls a human when it can&rsquo;s.
+            </h1>
+            <p className="mt-4 max-w-xl text-[15px] leading-relaxed text-[var(--pub-ink-2)]">
+              SupportAI runs the help desk. It answers from your documents, opens
+              tickets, checks orders, captures leads, and hands the conversation to
+              a person when the answer needs judgement. The chat is the real agent,
+              running live — try it now.
+            </p>
 
-              <div className="mt-6 flex flex-col gap-2.5 sm:flex-row sm:items-center">
-                <Link
-                  href="/register"
-                  className="inline-flex items-center justify-center rounded-md bg-[var(--pub-ink)] px-4 py-2.5 text-[14px] font-medium text-[var(--pub-panel)] hover:bg-[#2e2c28]"
-                >
-                  Create a free account
-                </Link>
-                <Link
-                  href="/login"
-                  className="inline-flex items-center justify-center rounded-md border border-[var(--pub-line-strong)] px-4 py-2.5 text-[14px] font-medium text-[var(--pub-ink)] hover:bg-[var(--pub-panel)]"
-                >
-                  Log in to the dashboard
-                </Link>
-              </div>
-
-              <p className="mt-4 max-w-lg text-[12px] leading-relaxed text-[var(--pub-ink-3)]">
-                Try the chat first — it needs no account. Guest chats run in a shared
-                demo workspace with a fresh thread each, so nothing is attached to an
-                account and nobody else can read your messages.
-              </p>
+            <div className="mt-6 flex flex-col gap-2.5 sm:flex-row sm:items-center">
+              <Link
+                href="/try"
+                className="inline-flex items-center justify-center rounded-md bg-[var(--pub-ink)] px-4 py-2.5 text-[14px] font-medium text-[var(--pub-panel)] hover:bg-[#2e2c28]"
+              >
+                Try it now — no signup
+              </Link>
+              <Link
+                href="/register"
+                className="inline-flex items-center justify-center rounded-md border border-[var(--pub-line-strong)] px-4 py-2.5 text-[14px] font-medium text-[var(--pub-ink)] hover:bg-[var(--pub-panel)]"
+              >
+                Create a free account
+              </Link>
             </div>
 
-            <div className="order-1 lg:order-2">
-              <DemoChatSlot />
-              <p className="mt-2 text-[11px] leading-relaxed text-[var(--pub-ink-3)]">
-                Worth trying:{" "}
-                {tryThese.map((t, i) => (
-                  <span key={t}>
-                    {i > 0 && " · "}
-                    <span className="text-[var(--pub-ink-2)]">&ldquo;{t}&rdquo;</span>
-                  </span>
-                ))}
-              </p>
-            </div>
+            <p className="mt-4 max-w-lg text-[12px] leading-relaxed text-[var(--pub-ink-3)]">
+              Try the live demo first — it needs no account. Guest chats run in a shared
+              demo workspace with a fresh thread each, so nothing is attached to an
+              account and nobody else can read your messages.
+            </p>
           </div>
         </section>
 
@@ -246,20 +224,26 @@ export default function Home() {
               doing yet.
             </p>
             <div className="mt-5 flex flex-col gap-2.5 sm:flex-row sm:items-center">
-              <a
-                href={PORTFOLIO_URL}
-                target="_blank"
-                rel="noopener noreferrer"
+              <Link
+                href="/try"
                 className="inline-flex items-center justify-center rounded-md bg-[var(--pub-ink)] px-4 py-2.5 text-[14px] font-medium text-[var(--pub-panel)] hover:bg-[#2e2c28]"
               >
-                djaouad.is-a.dev
-              </a>
+                Try it now — no signup
+              </Link>
               <Link
                 href="/register"
                 className="inline-flex items-center justify-center rounded-md border border-[var(--pub-line-strong)] px-4 py-2.5 text-[14px] font-medium text-[var(--pub-ink)] hover:bg-[var(--pub-panel)]"
               >
                 Create an account instead
               </Link>
+              <a
+                href={PORTFOLIO_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-[var(--pub-accent)] underline decoration-[var(--pub-line-strong)] underline-offset-2 hover:decoration-[var(--pub-accent)]"
+              >
+                djaouad.is-a.dev
+              </a>
             </div>
           </div>
         </section>
