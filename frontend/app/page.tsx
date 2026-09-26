@@ -1,16 +1,10 @@
 import Link from "next/link";
 import { API_BASE } from "../lib/api";
+import { DemoChatSlot } from "../components/demo-chat-slot";
 
 const PORTFOLIO_URL = "https://djaouad.is-a.dev";
 const APK_URL =
   "https://github.com/djoudad292/ai-customer-support-agent/releases/download/latest-apk/ai-customer-support.apk";
-
-/**
- * Public guest path: the real agent, running on the demo workspace. No token,
- * no account, no cookie — the backend issues a fresh conversation per socket,
- * so a visitor cannot read or continue another visitor's thread.
- */
-const DEMO_CHAT_SRC = `${API_BASE}/widget?company=demo`;
 
 const capabilities: [string, string][] = [
   [
@@ -151,17 +145,7 @@ export default function Home() {
             </div>
 
             <div className="order-1 lg:order-2">
-              <div className="overflow-hidden border border-[var(--pub-line-strong)] bg-[#0b0f14]">
-                <div className="flex items-center justify-between border-b border-[#1b222c] px-3 py-2 text-[11px] text-[#8a97a6]">
-                  <span>Live agent &middot; demo workspace</span>
-                  <span>no login</span>
-                </div>
-                <iframe
-                  src={DEMO_CHAT_SRC}
-                  title="Live AI customer support agent demo"
-                  className="block h-[520px] w-full border-0"
-                />
-              </div>
+              <DemoChatSlot />
               <p className="mt-2 text-[11px] leading-relaxed text-[var(--pub-ink-3)]">
                 Worth trying:{" "}
                 {tryThese.map((t, i) => (
