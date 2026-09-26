@@ -49,7 +49,7 @@ export default function Settings() {
     }
   }
 
-  const widgetCode = `<script src="https://customer.djaouad.tech/widget.js" data-company="${company?.slug || 'YOUR_SLUG'}"></script>`;
+  const widgetCode = `<script src="https://customer.djaouad.is-a.dev/widget.js" data-company="${company?.slug || 'YOUR_SLUG'}"></script>`;
 
   function copyWidget() {
     navigator.clipboard.writeText(widgetCode);

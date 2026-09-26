@@ -233,7 +233,7 @@ export default function PriorAuthDemo() {
         </div>
 
         <p className="mt-6 text-center text-xs text-slate-500">
-          Built by Djaouad Frih — djaouad.tech · Live systems: chat.djaouad.tech · customer.djaouad.tech · docs.djaouad.tech
+          Built by Djaouad Frih — djaouad.is-a.dev · Live systems: chat.djaouad.is-a.dev · customer.djaouad.is-a.dev · docs.djaouad.is-a.dev
         </p>
       </div>
     </main>
