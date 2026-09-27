@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { type ComponentType, useCallback, useEffect, useRef, useState } from 'react';
+import { CalendarCheck, Headphones, PackageSearch, Ticket, UserCheck } from 'lucide-react';
 import { API_BASE } from '../lib/api';
 
 const DEMO_CHAT_SRC = `${API_BASE}/widget?company=demo`;
@@ -13,6 +14,32 @@ const CONTINUE_AFTER_MS = 45000;
 const FADE_MS = 350;
 const RELOAD_AFTER_MS = 10000;
 const SPLASH_DISMISSED_KEY = 'supportai-try-splash-dismissed';
+
+type ExecutedAction = {
+  type: 'ticket' | 'appointment' | 'lead' | 'order' | 'escalate';
+  ok: boolean;
+  id?: string;
+  detail: string;
+};
+type ActivityRow = { key: string; action: ExecutedAction };
+
+const ACTION_TYPES = new Set<ExecutedAction['type']>(['ticket', 'appointment', 'lead', 'order', 'escalate']);
+
+const ACTION_ICONS: Record<ExecutedAction['type'], ComponentType<{ className?: string }>> = {
+  ticket: Ticket,
+  appointment: CalendarCheck,
+  lead: UserCheck,
+  order: PackageSearch,
+  escalate: Headphones,
+};
+
+const ACTION_LABELS: Record<ExecutedAction['type'], string> = {
+  ticket: 'Support ticket',
+  appointment: 'Appointment',
+  lead: 'Contact saved',
+  order: 'Order checked',
+  escalate: 'Human handoff',
+};
 
 function isSplashDismissed(): boolean {
   try {
@@ -44,6 +71,7 @@ export function DemoChatSlot() {
   );
   const [serverUp, setServerUp] = useState(false);
   const [elapsedMs, setElapsedMs] = useState(0);
+  const [activity, setActivity] = useState<ActivityRow[]>([]);
 
   const startedAtRef = useRef(0);
   const dismissedRef = useRef(false);
@@ -166,6 +194,50 @@ export function DemoChatSlot() {
     [],
   );
 
+  // Listen for live LangGraph side-effects posted from the widget iframe.
+  useEffect(() => {
+    const targetOrigin = new URL(API_BASE).origin;
+    const handler = (e: MessageEvent) => {
+      if (e.origin !== targetOrigin) return;
+      const d = e.data as unknown;
+      if (
+        !d ||
+        typeof d !== 'object' ||
+        (d as { source?: unknown }).source !== 'supportai-widget' ||
+        (d as { kind?: unknown }).kind !== 'agent-executed' ||
+        !Array.isArray((d as { executed?: unknown }).executed)
+      )
+        return;
+      const raw = (d as { executed: unknown[] }).executed;
+      const newRows: ActivityRow[] = [];
+      raw.forEach((entry, index) => {
+        if (!entry || typeof entry !== 'object') return;
+        const t = (entry as { type?: unknown }).type;
+        if (typeof t !== 'string' || !ACTION_TYPES.has(t as ExecutedAction['type'])) return;
+        const ok = (entry as { ok?: unknown }).ok === true;
+        if (typeof (entry as { detail?: unknown }).detail !== 'string') return;
+        const id =
+          typeof (entry as { id?: unknown }).id === 'string'
+            ? (entry as { id: string }).id
+            : undefined;
+        newRows.push({
+          key: `${e.timeStamp}-${index}-${Date.now()}`,
+          action: {
+            type: t as ExecutedAction['type'],
+            ok,
+            id,
+            detail: (entry as { detail: string }).detail,
+          },
+        });
+      });
+      if (newRows.length > 0) {
+        setActivity((prev) => [...prev, ...newRows].slice(-12));
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, []);
+
   const sec = Math.floor(elapsedMs / 1000);
   const statusText =
     sec < 15
@@ -203,8 +275,51 @@ export function DemoChatSlot() {
               The chat drops into this window the moment it connects — no account
               either way.
             </p>
+           </div>
+         )}
+        <div className="border-t border-[#1b222c]">
+          <div className="px-3 py-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] uppercase tracking-wide text-[#8a97a6]">LangGraph actions</span>
+              {activity.length > 0 && (
+                <span className="text-[11px] text-[#5d6875]">{activity.length} this session</span>
+              )}
+            </div>
+            {activity.length === 0 ? (
+              <p className="mt-1 text-[11px] text-[#5d6875]">
+                Ticket, booking and lead actions appear here live as the agent runs.
+              </p>
+            ) : (
+              <ul
+                className="mt-1.5 flex flex-col gap-1"
+                role="log"
+                aria-live="polite"
+                aria-label="Agent actions"
+              >
+                {activity.map((row) => {
+                  const Icon = ACTION_ICONS[row.action.type];
+                  const prefix = row.action.ok ? '✓ ' : '✗ ';
+                  const idPart = row.action.id ? ` ${row.action.id}` : '';
+                  return (
+                    <li key={row.key} className="flex items-start gap-2 text-[11px] leading-snug">
+                      <Icon
+                        className={`mt-px h-3 w-3 shrink-0 ${row.action.ok ? 'text-[#4c9a83]' : 'text-[#c96b6b]'}`}
+                        aria-hidden="true"
+                      />
+                      <span className={row.action.ok ? 'text-[#b9c7c1]' : 'text-[#d8a7ab]'}>
+                        {prefix}
+                        {ACTION_LABELS[row.action.type]}
+                        {idPart}
+                        {' — '}
+                        {row.action.detail}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </div>
-        )}
+        </div>
       </div>
 
       {overlay !== 'gone' && (
