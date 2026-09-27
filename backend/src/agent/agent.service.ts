@@ -3,6 +3,27 @@ import { PrismaService } from '../common/prisma.service';
 import { AgentGraph } from './agent.graph';
 import { KnowledgeBaseService } from '../knowledge-base/knowledge-base.service';
 
+/**
+ * Folds every yielded stream chunk ({ [nodeName]: partialState }) into a single
+ * object. chat() only needs scalar/`executed` fields from this fold; message
+ * history is read from the DB, so `messages` replacement across chunks is
+ * irrelevant. Values undefined/null do NOT overwrite an existing key.
+ */
+export function accumulateGraphState(updates: Record<string, any>[]): Record<string, any> {
+  const state: Record<string, any> = {};
+  for (const chunk of updates) {
+    for (const nodeKey of Object.keys(chunk)) {
+      const value = chunk[nodeKey];
+      if (value && typeof value === 'object') {
+        Object.assign(state, value);
+      } else if (value !== undefined && value !== null) {
+        state[nodeKey] = value;
+      }
+    }
+  }
+  return state;
+}
+
 @Injectable()
 export class AgentService {
   private logger = new Logger(AgentService.name);
@@ -64,7 +85,7 @@ export class AgentService {
           content: response,
         },
       });
-      return { conversationId, response, action: null, trace: this.trace, metadata: null };
+      return { conversationId, response, action: null, actionSummary: '', executed: [], trace: this.trace, metadata: null };
     }
 
     const history = conversation?.messages.map((m) => ({
@@ -73,7 +94,7 @@ export class AgentService {
     })) || [];
 
     // Use stream to get intermediate steps
-    let finalResult;
+    const updates: Record<string, any>[] = [];
     try {
       const stream = await this.agentGraph.getCompiledGraph().stream({
         messages: [...history, { role: 'human', content: message }],
@@ -86,7 +107,7 @@ export class AgentService {
 
       for await (const update of stream) {
         this.trace.push(update);
-        finalResult = update;
+        updates.push(update);
       }
     } catch (streamError) {
       this.logger.error(`Stream error: ${streamError}`);
@@ -99,14 +120,15 @@ export class AgentService {
       return {
         conversationId,
         response: result.response,
-        action: result.pendingAction,
+        action: result.pendingAction || null,
+        actionSummary: result.actionSummary || '',
+        executed: Array.isArray(result.executed) ? result.executed : [],
         trace: this.trace,
-        metadata: result.responseMetadata,
+        metadata: result.responseMetadata ?? null,
       };
     }
 
-    // Get final state
-    const result = finalResult[Object.keys(finalResult)[0]];
+    const state = accumulateGraphState(updates);
 
     await this.prisma.message.create({
       data: {
@@ -114,16 +136,18 @@ export class AgentService {
         conversationId,
         senderType: 'agent',
         senderId: 'ai-agent',
-        content: result.response,
+        content: state.response,
       },
     });
 
     return {
       conversationId,
-      response: result.response,
-      action: result.pendingAction,
+      response: state.response,
+      action: state.pendingAction ?? null,
+      actionSummary: state.actionSummary || '',
+      executed: Array.isArray(state.executed) ? state.executed : [],
       trace: this.trace,
-      metadata: result.responseMetadata,
+      metadata: state.responseMetadata ?? null,
     };
   }
 

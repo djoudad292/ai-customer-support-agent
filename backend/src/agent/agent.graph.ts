@@ -8,6 +8,13 @@ import { KnowledgeBaseService } from '../knowledge-base/knowledge-base.service';
 
 const OR_KEY = process.env.OPENROUTER_API_KEY || '';
 
+export interface ExecutedAction {
+  type: 'ticket' | 'appointment' | 'lead' | 'order' | 'escalate';
+  ok: boolean;
+  id?: string;
+  detail: string;
+}
+
 export const AgentState = Annotation.Root({
   messages: Annotation<{ role: string; content: string }[]>({
     reducer: (current, update) => [...current, ...update],
@@ -30,6 +37,10 @@ export const AgentState = Annotation.Root({
   actionSummary: Annotation<string>({
     reducer: (current, update) => update || current,
     default: () => '',
+  }),
+  executed: Annotation<ExecutedAction[]>({
+    reducer: (current, update) => [...current, ...(update ?? [])],
+    default: () => [],
   }),
   sentiment: Annotation<string>({
     reducer: (current, update) => update || current,
@@ -318,6 +329,7 @@ Reply with ONLY the action identifier (none, capture_lead, book_appointment, cre
     if (info.phone) capturedParts.push(`Phone: ${info.phone}`);
 
     let leadId = '';
+    let leadOk = false;
     try {
       const lead = await this.prisma.lead.create({
         data: {
@@ -333,15 +345,24 @@ Reply with ONLY the action identifier (none, capture_lead, book_appointment, cre
         },
       });
       leadId = lead.id.slice(0, 8).toUpperCase();
+      leadOk = true;
     } catch (error) {
       this.logger.error(`Failed to capture lead: ${error}`);
     }
 
-    const summary = capturedParts.length > 0
-      ? `Lead captured (${leadId}): ${capturedParts.join(', ')}. A team member will reach out within 24 hours.`
-      : `Lead captured (${leadId}): Contact request recorded. Our team will reach out soon.`;
+    const detail = capturedParts.join(', ') || 'Contact request recorded';
+    let summary: string;
+    if (leadOk && leadId) {
+      summary = capturedParts.length > 0
+        ? `Lead captured (${leadId}): ${capturedParts.join(', ')}. A team member will reach out within 24 hours.`
+        : `Lead captured (${leadId}): Contact request recorded. Our team will reach out soon.`;
+    } else {
+      summary = `Lead could not be saved — please try again.`;
+    }
 
-    return { customerInfo: info, actionSummary: summary, messages: [] };
+    const executed: ExecutedAction[] = [{ type: 'lead', ok: leadOk, id: leadId || undefined, detail }];
+
+    return { customerInfo: info, actionSummary: summary, executed, messages: [] };
   }
 
   private async bookAppointmentNode(state: typeof AgentState.State) {
@@ -369,6 +390,7 @@ Reply with ONLY the action identifier (none, capture_lead, book_appointment, cre
     const formattedEnd = endTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
     let apptId = '';
+    let apptOk = false;
     try {
       const appt = await this.prisma.appointment.create({
         data: {
@@ -385,12 +407,21 @@ Reply with ONLY the action identifier (none, capture_lead, book_appointment, cre
         },
       });
       apptId = appt.id.slice(0, 8).toUpperCase();
+      apptOk = true;
     } catch (error) {
       this.logger.error(`Failed to book appointment: ${error}`);
     }
 
-    const summary = `Appointment booked (${apptId}): ${formattedDate} to ${formattedEnd}. A calendar invite will be sent to ${state.customerInfo?.email || 'your email'}.`;
-    return { actionSummary: summary, messages: [] };
+    let summary: string;
+    if (apptOk && apptId) {
+      summary = `Appointment booked (${apptId}): ${formattedDate} to ${formattedEnd}. A calendar invite will be sent to ${state.customerInfo?.email || 'your email'}.`;
+    } else {
+      summary = `Appointment could not be booked — please try again.`;
+    }
+
+    const executed: ExecutedAction[] = [{ type: 'appointment', ok: apptOk, id: apptId || undefined, detail: formattedDate }];
+
+    return { actionSummary: summary, executed, messages: [] };
   }
 
   private async createTicketNode(state: typeof AgentState.State) {
@@ -402,6 +433,7 @@ Reply with ONLY the action identifier (none, capture_lead, book_appointment, cre
     const category = actionData.category || 'general';
 
     let ticketNumber = '';
+    let ticketOk = false;
     try {
       const count = await this.prisma.ticket.count({ where: { companyId: state.companyId } });
       const ticket = await this.prisma.ticket.create({
@@ -419,13 +451,23 @@ Reply with ONLY the action identifier (none, capture_lead, book_appointment, cre
         },
       });
       ticketNumber = ticket.ticketNumber;
+      ticketOk = true;
       this.logger.log(`Created ticket ${ticketNumber} for conversation ${state.conversationId}`);
     } catch (error) {
       this.logger.error(`Failed to create ticket: ${error}`);
     }
 
-    const summary = `Support ticket created: ${ticketNumber} | Priority: ${priorityLabel} | Category: ${category.charAt(0).toUpperCase() + category.slice(1)} | Status: Open`;
-    return { actionSummary: summary, messages: [] };
+    const detail = `Priority ${priorityLabel} · ${category}`;
+    let summary: string;
+    if (ticketOk && ticketNumber) {
+      summary = `Support ticket created: ${ticketNumber} | Priority: ${priorityLabel} | Category: ${category.charAt(0).toUpperCase() + category.slice(1)} | Status: Open`;
+    } else {
+      summary = `Support ticket could not be created — please try again.`;
+    }
+
+    const executed: ExecutedAction[] = [{ type: 'ticket', ok: ticketOk, id: ticketNumber || undefined, detail }];
+
+    return { actionSummary: summary, executed, messages: [] };
   }
 
   private async lookupOrderNode(state: typeof AgentState.State) {
@@ -440,16 +482,25 @@ Reply with ONLY the action identifier (none, capture_lead, book_appointment, cre
 
         if (order) {
           const summary = `Order ${order.orderNumber}: Status: ${order.status} | Total: ${order.total} ${order.currency}${order.trackingNumber ? ` | Tracking: ${order.trackingNumber}` : ''}`;
+          const executed: ExecutedAction[] = [{
+            type: 'order',
+            ok: true,
+            id: order.orderNumber,
+            detail: `Status: ${order.status} · Total: ${order.total} ${order.currency}${order.trackingNumber ? ` · Tracking: ${order.trackingNumber}` : ''}`,
+          }];
           return {
             actionSummary: summary,
+            executed,
             messages: [{
               role: 'system',
               content: `Order found. ${summary}. Craft a helpful response with this information.`,
             }],
           };
         } else {
+          const executed: ExecutedAction[] = [{ type: 'order', ok: false, id: orderNumber, detail: 'Not found in demo orders' }];
           return {
             actionSummary: `Order #${orderNumber} not found in our system`,
+            executed,
             messages: [{
               role: 'system',
               content: `Order ${orderNumber} was not found. Ask the customer to double-check the order number. Offer to help them find it using their email or phone.`,
@@ -461,8 +512,10 @@ Reply with ONLY the action identifier (none, capture_lead, book_appointment, cre
       }
     }
 
+    const executed: ExecutedAction[] = [{ type: 'order', ok: false, detail: 'No order number provided' }];
     return {
       actionSummary: 'No order number provided',
+      executed,
       messages: [{
         role: 'system',
         content: 'Could not find an order number in the message. Ask the customer for their order number. You can also offer to look it up using their email address.',
@@ -484,8 +537,11 @@ Reply with ONLY the action identifier (none, capture_lead, book_appointment, cre
       this.logger.error(`Escalation failed: ${error}`);
     }
 
+    const executed: ExecutedAction[] = [{ type: 'escalate', ok: true, id: state.conversationId.slice(0, 8), detail: 'Handed to human queue' }];
+
     return {
       actionSummary: 'Conversation escalated to human agent. Priority queue assigned.',
+      executed,
       messages: [{
         role: 'system',
         content: 'The customer is upset. Acknowledge their frustration sincerely, apologize, and let them know a human specialist is being connected. Do NOT be robotic or dismissive.',
@@ -599,6 +655,7 @@ Examples of good responses:
       pendingActionData: result.pendingActionData,
       customerInfo: result.customerInfo,
       actionSummary: result.actionSummary,
+      executed: result.executed ?? [],
       sentiment: result.sentiment,
       responseMetadata: result.responseMetadata,
     };

@@ -94,6 +94,8 @@ export class WidgetGateway
           conversationId: result.conversationId,
           content: result.response,
           action: result.action || null,
+          actionSummary: result.actionSummary || '',
+          executed: Array.isArray(result.executed) ? result.executed : [],
           cited,
         }),
       );

@@ -73,6 +73,11 @@ export class WidgetController {
     .typing span{display:inline-block;width:5px;height:5px;background:#69737d;border-radius:50%;margin:0 2px;animation:bounce 1.4s infinite}
     .typing span:nth-child(2){animation-delay:0.2s}.typing span:nth-child(3){animation-delay:0.4s}
     @keyframes bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-5px)}}
+.action-card{margin:0 14px 10px 14px;padding:8px 11px;border-radius:10px;font-size:12px;line-height:1.5;border:1px solid #1e242c;background:#0f1a15;color:#c9d6cf;display:flex;gap:8px;align-items:flex-start}
+.action-card.bad{background:#1a1214;color:#e6c9cd;border-color:#3a2429}
+.action-card .ac-badge{flex:0 0 auto;font-weight:700}
+.action-card .ac-id{color:#7fd1a7;font-weight:600}
+.action-card.bad .ac-id{color:#e08b95}
   </style>
 </head>
 <body>
@@ -96,6 +101,7 @@ export class WidgetController {
     var WS = null;
     var CONV_ID = null;
     var COMPANY_ID = new URLSearchParams(location.search).get('company') || 'demo';
+    var ACTION_LABELS = { ticket:'Support ticket', appointment:'Appointment', lead:'Contact saved', order:'Order checked', escalate:'Human handoff' };
 
     function connect() {
       WS = new WebSocket('${host.replace('https', 'wss')}/ws?company=' + encodeURIComponent(COMPANY_ID));
@@ -109,6 +115,12 @@ export class WidgetController {
         if (d.type === 'message') {
           if (d.conversationId) CONV_ID = d.conversationId;
           addMsg(d.content, 'bot');
+          if (d.executed && d.executed.length) {
+            addActionCard(d.executed);
+            if (window.parent !== window) {
+              window.parent.postMessage({ source:'supportai-widget', kind:'agent-executed', executed:d.executed||[], actionSummary:d.actionSummary||'', action:d.action||null, conversationId:d.conversationId||null }, '*');
+            }
+          }
         }
         if (d.type === 'error') addMsg(d.content, 'bot');
         document.getElementById('typing').style.display = 'none';
@@ -121,6 +133,32 @@ export class WidgetController {
       m.textContent = text;
       var box = document.getElementById('msgs');
       box.appendChild(m);
+      box.scrollTop = box.scrollHeight;
+    }
+
+    function addActionCard(list) {
+      var box = document.getElementById('msgs');
+      for (var i = 0; i < list.length; i++) {
+        var a = list[i];
+        var el = document.createElement('div');
+        el.className = 'action-card' + (a.ok ? '' : ' bad');
+        var badge = document.createElement('span');
+        badge.className = 'ac-badge';
+        badge.textContent = a.ok ? '\u2713' : '\u2717';
+        el.appendChild(badge);
+        var label = ACTION_LABELS[a.type] || a.type;
+        if (a.id) {
+          var idSpan = document.createElement('span');
+          idSpan.className = 'ac-id';
+          idSpan.textContent = a.id;
+          el.appendChild(document.createTextNode(label + ' '));
+          el.appendChild(idSpan);
+          el.appendChild(document.createTextNode(' \u2014 ' + a.detail));
+        } else {
+          el.appendChild(document.createTextNode(label + ' \u2014 ' + a.detail));
+        }
+        box.appendChild(el);
+      }
       box.scrollTop = box.scrollHeight;
     }
 
