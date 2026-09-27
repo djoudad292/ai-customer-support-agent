@@ -11,6 +11,24 @@ const MIN_SPLASH_MS = 700;
 const IFRAME_FALLBACK_MS = 15000;
 const CONTINUE_AFTER_MS = 45000;
 const FADE_MS = 350;
+const RELOAD_AFTER_MS = 10000;
+const SPLASH_DISMISSED_KEY = 'supportai-try-splash-dismissed';
+
+function isSplashDismissed(): boolean {
+  try {
+    return window.sessionStorage.getItem(SPLASH_DISMISSED_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function markSplashDismissed(): void {
+  try {
+    window.sessionStorage.setItem(SPLASH_DISMISSED_KEY, '1');
+  } catch {
+    // storage unavailable (e.g. private mode) — best effort only
+  }
+}
 
 type Overlay = 'shown' | 'fading' | 'gone';
 
@@ -21,28 +39,46 @@ type Overlay = 'shown' | 'fading' | 'gone';
  * with an escape hatch so nobody is ever trapped behind the splash.
  */
 export function DemoChatSlot() {
-  const [overlay, setOverlay] = useState<Overlay>('shown');
+  const [overlay, setOverlay] = useState<Overlay>(
+    isSplashDismissed() ? 'gone' : 'shown',
+  );
   const [serverUp, setServerUp] = useState(false);
   const [elapsedMs, setElapsedMs] = useState(0);
 
   const startedAtRef = useRef(0);
   const dismissedRef = useRef(false);
   const timeoutIdsRef = useRef<number[]>([]);
+  const reloadTimerRef = useRef<number | null>(null);
 
   const later = useCallback((fn: () => void, ms: number) => {
     const id = window.setTimeout(fn, ms);
     timeoutIdsRef.current.push(id);
   }, []);
 
+  const clearReloadTimer = useCallback(() => {
+    if (reloadTimerRef.current !== null) {
+      window.clearTimeout(reloadTimerRef.current);
+      reloadTimerRef.current = null;
+    }
+  }, []);
+
+  // Auto dismissal: probe success, iframe load, fallback timer. No persistence.
   const dismiss = useCallback(() => {
     if (dismissedRef.current) return;
     dismissedRef.current = true;
+    clearReloadTimer();
     const wait = Math.max(0, MIN_SPLASH_MS - (Date.now() - startedAtRef.current));
     later(() => {
       setOverlay('fading');
       later(() => setOverlay('gone'), FADE_MS);
     }, wait);
-  }, [later]);
+  }, [later, clearReloadTimer]);
+
+  // User dismissal: Esc or "Open the page". Persists across the reload loop.
+  const dismissUser = useCallback(() => {
+    markSplashDismissed();
+    dismiss();
+  }, [dismiss]);
 
   // Start the clock and poll the backend until it answers (CORS is open: *).
   useEffect(() => {
@@ -50,6 +86,16 @@ export function DemoChatSlot() {
     let cancelled = false;
     let retryId = 0;
     let inflight: AbortController | null = null;
+
+    // If the visitor hasn't dismissed the splash, give the backend 10s to
+    // respond before reloading — the fresh load restarts the cycle, stopping
+    // only when /health answers or the user dismisses. The dismissedRef guard
+    // also prevents rescheduling during the fade-out (overlay transitions).
+    if (overlay !== 'gone' && !dismissedRef.current) {
+      reloadTimerRef.current = window.setTimeout(() => {
+        window.location.reload();
+      }, RELOAD_AFTER_MS);
+    }
 
     const probe = async () => {
       inflight?.abort();
@@ -65,6 +111,7 @@ export function DemoChatSlot() {
           const data = (await res.json().catch(() => null)) as { status?: string } | null;
           if (data && (data.status === 'ok' || data.status === 'degraded')) {
             window.clearTimeout(hardStop);
+            clearReloadTimer();
             if (!cancelled) setServerUp(true);
             return;
           }
@@ -80,9 +127,10 @@ export function DemoChatSlot() {
     return () => {
       cancelled = true;
       window.clearTimeout(retryId);
+      clearReloadTimer();
       inflight?.abort();
     };
-  }, []);
+  }, [overlay, clearReloadTimer]);
 
   // Elapsed clock for the status copy; stops once the splash is gone.
   useEffect(() => {
@@ -101,14 +149,14 @@ export function DemoChatSlot() {
     return () => window.clearTimeout(id);
   }, [serverUp, overlay, dismiss]);
 
-  // Esc leaves the splash.
+  // Esc leaves the splash (user-initiated: persists across the reload loop).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') dismiss();
+      if (e.key === 'Escape') dismissUser();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [dismiss]);
+  }, [dismissUser]);
 
   // Clear pending fades if the page unloads mid-transition.
   useEffect(
@@ -193,7 +241,7 @@ export function DemoChatSlot() {
             {showContinue && (
               <button
                 type="button"
-                onClick={dismiss}
+                onClick={dismissUser}
                 className="mt-6 rounded-md border border-[var(--pub-line-strong)] px-4 py-2 text-[13px] font-medium text-[var(--pub-ink)] hover:bg-[var(--pub-panel)]"
               >
                 Open the page
