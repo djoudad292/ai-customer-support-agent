@@ -8,12 +8,20 @@ interface ProbeResult {
   err?: string;
 }
 
-interface GeminiKeyResult {
-  i: number;
+interface GeminiModelResult {
+  model: string;
   ok: boolean;
   status?: number;
   ms: number;
   err?: string;
+}
+
+interface GeminiKeyResult {
+  i: number;
+  keyTail: string;
+  ok: boolean;
+  ms: number;
+  models: GeminiModelResult[];
 }
 
 interface GeminiResult {
@@ -85,6 +93,7 @@ export class DiagController {
   }
 
   private async probeGemini(): Promise<GeminiResult> {
+    const geminiModels = ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-2.5-flash'];
     const geminiKeys: string[] = [
       process.env.GOOGLE_API_KEY,
       ...(process.env.GOOGLE_API_KEY_2 ? process.env.GOOGLE_API_KEY_2.split(/[\s,]+/) : []),
@@ -96,41 +105,47 @@ export class DiagController {
     const results: GeminiKeyResult[] = [];
     let anyOk = false;
     for (let i = 0; i < keys.length; i++) {
-      const start = Date.now();
-      try {
-        const res = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${keys[i]}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            signal: AbortSignal.timeout(8000),
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: 'Reply with OK' }] }],
-            }),
-          },
-        );
-        const ms = Date.now() - start;
-        if (res.ok) {
-          anyOk = true;
-          results.push({ i, ok: true, status: res.status, ms });
-        } else {
-          const body = await res.text();
-          results.push({
-            i,
+      const keyResult: GeminiKeyResult = { i, keyTail: keys[i].slice(-4), ok: false, ms: 0, models: [] };
+      for (const model of geminiModels) {
+        const start = Date.now();
+        try {
+          const res = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${keys[i]}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              signal: AbortSignal.timeout(6000),
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: 'Reply with OK' }] }],
+              }),
+            },
+          );
+          const ms = Date.now() - start;
+          if (res.ok) {
+            keyResult.ok = true;
+            anyOk = true;
+            keyResult.models.push({ model, ok: true, status: res.status, ms });
+          } else {
+            const body = await res.text();
+            keyResult.models.push({
+              model,
+              ok: false,
+              status: res.status,
+              ms,
+              err: sanitizeErr(`HTTP_${res.status}_${body.slice(0, 200)}`),
+            });
+          }
+        } catch (e) {
+          keyResult.models.push({
+            model,
             ok: false,
-            status: res.status,
-            ms,
-            err: sanitizeErr(`HTTP_${res.status}_${body.slice(0, 200)}`),
+            ms: Date.now() - start,
+            err: sanitizeErr(String(e).slice(0, 200)),
           });
         }
-      } catch (e) {
-        results.push({
-          i,
-          ok: false,
-          ms: Date.now() - start,
-          err: sanitizeErr(String(e).slice(0, 200)),
-        });
       }
+      keyResult.ms = keyResult.models.reduce((acc, m) => acc + m.ms, 0);
+      results.push(keyResult);
     }
     return { ok: anyOk, keys: results };
   }

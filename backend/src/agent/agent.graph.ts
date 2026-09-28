@@ -107,24 +107,32 @@ export class AgentGraph {
     }
     // Space/comma-separated pool: GOOGLE_API_KEY, GOOGLE_API_KEY_2, ... —
     // rotates per call so one exhausted key no longer kills the demo.
+    const geminiModels = [
+      ...(process.env.GEMINI_MODEL ? [process.env.GEMINI_MODEL] : []),
+      'gemini-3.8-flash',
+      'gemini-flash-latest',
+      'gemini-2.5-flash',
+    ].filter((m, i, a) => a.indexOf(m) === i);
     const geminiKeys = [
       process.env.GOOGLE_API_KEY,
       ...(process.env.GOOGLE_API_KEY_2 ? process.env.GOOGLE_API_KEY_2.split(/[\s,]+/) : []),
     ].filter(Boolean) as string[];
     let fallbackErr: unknown = new Error('no Gemini keys configured');
     for (const gkey of geminiKeys) {
-      try {
-        const fallback = new ChatGoogleGenerativeAI({
-          apiKey: gkey,
-          model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
-          maxOutputTokens: opts.maxTokens,
-          temperature: opts.temperature,
-        });
-        const result = await this.withTimeout(fallback.invoke(messages as any), 30000, 'gemini');
-        return result.content.toString();
-      } catch (e) {
-        fallbackErr = e;
-        this.logger.warn(`Gemini key ...${gkey.slice(-6)} failed, trying next: ${e}`);
+      for (const model of geminiModels) {
+        try {
+          const fallback = new ChatGoogleGenerativeAI({
+            apiKey: gkey,
+            model,
+            maxOutputTokens: opts.maxTokens,
+            temperature: opts.temperature,
+          });
+          const result = await this.withTimeout(fallback.invoke(messages as any), 30000, 'gemini');
+          return result.content.toString();
+        } catch (e) {
+          fallbackErr = e;
+          this.logger.warn(`Gemini key ...${gkey.slice(-6)} model ${model} failed: ${e}`);
+        }
       }
     }
     this.logger.error(`All LLM providers failed: ${fallbackErr}`);
