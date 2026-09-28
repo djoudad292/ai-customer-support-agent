@@ -77,6 +77,17 @@ export class AgentGraph {
    * NEVER return canned user-facing copy from here: callers decide how to
    * surface LLM_UNAVAILABLE so the UI can retry honestly.
    */
+  private lastHumanMessage(state: typeof AgentState.State): { role: string; content: string } | undefined {
+    const messages = state.messages || [];
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i] as any;
+      if (m?.role === 'human' || m?._getType?.() === 'human' || m?.type === 'human') {
+        return m;
+      }
+    }
+    return messages.length > 0 ? messages[messages.length - 1] : undefined;
+  }
+
   private withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
     return Promise.race([
       p,
@@ -214,7 +225,7 @@ export class AgentGraph {
   }
 
   private async decideActionNode(state: typeof AgentState.State) {
-    const lastMessage = state.messages[state.messages.length - 1];
+    const lastMessage = this.lastHumanMessage(state);
     if (!lastMessage) return { pendingAction: null };
 
     const conversationHistory = state.messages
@@ -317,7 +328,7 @@ Reply with ONLY the action identifier (none, capture_lead, book_appointment, cre
   }
 
   private async captureLeadNode(state: typeof AgentState.State) {
-    const lastMessage = state.messages[state.messages.length - 1];
+    const lastMessage = this.lastHumanMessage(state);
     const content = lastMessage?.content || '';
 
     const emailMatch = content.match(/[\w.+-]+@[\w-]+\.[\w.-]+/);
@@ -374,7 +385,7 @@ Reply with ONLY the action identifier (none, capture_lead, book_appointment, cre
   }
 
   private async bookAppointmentNode(state: typeof AgentState.State) {
-    const lastMessage = state.messages[state.messages.length - 1];
+    const lastMessage = this.lastHumanMessage(state);
     const content = lastMessage?.content || '';
 
     const datePatterns = content.match(/(\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}|\w+\s+\d{1,2}(?:st|nd|rd|th)?(?:\s*,?\s*\d{4})?)/i);
@@ -433,7 +444,7 @@ Reply with ONLY the action identifier (none, capture_lead, book_appointment, cre
   }
 
   private async createTicketNode(state: typeof AgentState.State) {
-    const lastMessage = state.messages[state.messages.length - 1];
+    const lastMessage = this.lastHumanMessage(state);
     const content = lastMessage?.content || '';
     const actionData = state.pendingActionData || {};
 
