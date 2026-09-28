@@ -295,9 +295,7 @@ export function DemoChatSlot({ starter }: { starter?: string }) {
                   </span>
                   <span className="ml-2 text-[11px] text-[#5d6875]">Live · this session</span>
                 </div>
-                {activity.length > 0 && (
-                  <span className="text-[11px] text-[#5d6875]">{activity.length} this session</span>
-                )}
+                
               </div>
               {activity.length === 0 ? (
                 <p className="mt-1 text-[11px] text-[#5d6875]">
