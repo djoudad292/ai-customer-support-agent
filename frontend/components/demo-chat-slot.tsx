@@ -65,7 +65,7 @@ type Overlay = 'shown' | 'fading' | 'gone';
  * them on a branded screen until /health answers and the widget has loaded,
  * with an escape hatch so nobody is ever trapped behind the splash.
  */
-export function DemoChatSlot() {
+export function DemoChatSlot({ starter }: { starter?: string }) {
   const [overlay, setOverlay] = useState<Overlay>(
     isSplashDismissed() ? 'gone' : 'shown',
   );
@@ -257,7 +257,12 @@ export function DemoChatSlot() {
           </div>
           {serverUp ? (
             <iframe
-              src={DEMO_CHAT_SRC}
+              key={starter || "default"}
+              src={
+                starter
+                  ? `${DEMO_CHAT_SRC}&starter=${encodeURIComponent(starter)}`
+                  : DEMO_CHAT_SRC
+              }
               title="Live AI customer support agent demo"
               className="block h-[520px] w-full border-0"
               onLoad={() => dismiss()}

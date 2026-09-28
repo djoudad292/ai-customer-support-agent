@@ -103,9 +103,15 @@ export class WidgetController {
     var COMPANY_ID = new URLSearchParams(location.search).get('company') || 'demo';
     var ACTION_LABELS = { ticket:'Support ticket', appointment:'Appointment', lead:'Contact saved', order:'Order checked', escalate:'Human handoff' };
 
+    var STARTER = new URLSearchParams(location.search).get('starter');
+    var STARTER_SENT_KEY = 'supportai-starter-sent';
+
     function connect() {
       WS = new WebSocket('${host.replace('https', 'wss')}/ws?company=' + encodeURIComponent(COMPANY_ID));
-      WS.onopen = function() { document.getElementById('status').textContent = 'Online'; };
+      WS.onopen = function() {
+        document.getElementById('status').textContent = 'Online';
+        maybeSendStarter();
+      };
       WS.onclose = function() {
         document.getElementById('status').textContent = 'Reconnecting...';
         setTimeout(connect, 1500);
@@ -171,6 +177,14 @@ export class WidgetController {
       inp.value = '';
       document.getElementById('typing').style.display = 'flex';
       WS.send(JSON.stringify({ event: 'chat', data: { message: text, conversationId: CONV_ID } }));
+    }
+
+    function maybeSendStarter() {
+      if (!STARTER) return;
+      if (sessionStorage.getItem(STARTER_SENT_KEY)) return;
+      sessionStorage.setItem(STARTER_SENT_KEY, '1');
+      document.getElementById('inp').value = STARTER;
+      send();
     }
 
     document.getElementById('send').onclick = send;

@@ -1,12 +1,8 @@
-import type { Metadata } from "next";
+'use client';
+
+import { useState } from "react";
 import Link from "next/link";
 import { DemoChatSlot } from "../../components/demo-chat-slot";
-
-export const metadata: Metadata = {
-  title: "Try the AI Support demo — live",
-  description:
-    "Try the AI customer support agent live. Answer questions from documents, open tickets, check orders and hand off to a human — no account needed.",
-};
 
 const tryThese = [
   "I need a refund for order #1234",
@@ -15,6 +11,7 @@ const tryThese = [
 ];
 
 export default function TryPage() {
+  const [starter, setStarter] = useState("");
   return (
     <div className="pub min-h-screen">
       <header className="sticky top-0 z-40 border-b border-[var(--pub-line)] bg-[var(--pub-bg)]">
@@ -95,16 +92,25 @@ export default function TryPage() {
             <ul className="mt-2 flex flex-wrap gap-2">
               {tryThese.map((t) => (
                 <li key={t}>
-                  <span className="inline-block rounded-md border border-[var(--pub-line-strong)] bg-[var(--pub-panel)] px-3 py-1.5 text-[13px] text-[var(--pub-ink-2)]">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStarter(t);
+                      document
+                        .getElementById("chat")
+                        ?.scrollIntoView({ behavior: "smooth" });
+                    }}
+                    className="inline-block cursor-pointer rounded-md border border-[var(--pub-line-strong)] bg-[var(--pub-panel)] px-3 py-1.5 text-[13px] text-[var(--pub-ink-2)] hover:text-[var(--pub-ink)]"
+                  >
                     {t}
-                  </span>
+                  </button>
                 </li>
               ))}
             </ul>
           </div>
 
           <div id="chat" className="scroll-mt-20 lg:pt-4">
-            <DemoChatSlot />
+            <DemoChatSlot starter={starter} />
             <p className="mt-2 text-[11px] leading-relaxed text-[var(--pub-ink-3)]">
               Worth trying:{" "}
               {tryThese.map((t, i) => (
