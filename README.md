@@ -6,6 +6,18 @@ A production-ready AI support agent that **handles real customer conversations**
 
 ![AI Customer Support Agent — LangGraph-powered live demo](screenshots/support-agent-hero.png)
 
+![Landing page](screenshots/support-landing.png)
+
+![Ticket action card](screenshots/support-tickets.png)
+
+![Dashboard](screenshots/support-dashboard.png)
+
+![Knowledge base search](screenshots/support-try.png)
+
+[Demo video: support flow](screenshots/support-flow.webm)
+
+[Demo video: dashboard](screenshots/support-dashboard.webm)
+
 ## Features
 
 - **Multi-turn conversations** with context memory.
