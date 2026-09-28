@@ -249,7 +249,7 @@ export function DemoChatSlot({ starter }: { starter?: string }) {
 
   return (
     <>
-      <div className="lg:grid lg:grid-cols-[minmax(0,380px,1fr)_260px] lg:items-start lg:gap-8">
+      <div className="lg:grid lg:grid-cols-[1fr_260px] lg:items-start lg:gap-8">
         <div className="overflow-hidden border border-[var(--pub-line-strong)] bg-[#0b0f14]">
           <div className="flex items-center justify-between border-b border-[#1b222c] px-3 py-2 text-[11px] text-[#8a97a6]">
             <span>Live agent &middot; demo workspace</span>
