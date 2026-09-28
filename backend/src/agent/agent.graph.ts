@@ -116,7 +116,7 @@ export class AgentGraph {
       try {
         const fallback = new ChatGoogleGenerativeAI({
           apiKey: gkey,
-          model: 'gemini-3.6-flash',
+          model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
           maxOutputTokens: opts.maxTokens,
           temperature: opts.temperature,
         });
