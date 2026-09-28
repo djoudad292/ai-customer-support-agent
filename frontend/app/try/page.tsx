@@ -18,7 +18,7 @@ export default function TryPage() {
   return (
     <div className="pub min-h-screen">
       <header className="sticky top-0 z-40 border-b border-[var(--pub-line)] bg-[var(--pub-bg)]">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
           <div className="flex items-baseline gap-2.5">
             <span className="text-[15px] font-semibold tracking-tight text-[var(--pub-ink)]">
               SupportAI
@@ -57,8 +57,8 @@ export default function TryPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl px-4 py-10 sm:px-6 sm:py-14">
-        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-14">
+      <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
+        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,44rem)] lg:gap-14">
           <div className="lg:pr-2">
             <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--pub-accent)]">
               Live demo · no account needed
@@ -119,7 +119,7 @@ export default function TryPage() {
       </main>
 
       <footer className="border-t border-[var(--pub-line)]">
-        <div className="mx-auto flex max-w-5xl flex-col gap-1 px-4 py-6 text-[11px] leading-5 text-[var(--pub-ink-3)] sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <div className="mx-auto flex max-w-6xl flex-col gap-1 px-4 py-6 text-[11px] leading-5 text-[var(--pub-ink-3)] sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <span>SupportAI &middot; Next.js, NestJS, Postgres + pgvector, LangGraph</span>
           <span>
             Built by{" "}

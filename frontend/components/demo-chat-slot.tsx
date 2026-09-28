@@ -34,11 +34,11 @@ const ACTION_ICONS: Record<ExecutedAction['type'], ComponentType<{ className?: s
 };
 
 const ACTION_LABELS: Record<ExecutedAction['type'], string> = {
-  ticket: 'Support ticket',
-  appointment: 'Appointment',
-  lead: 'Contact saved',
-  order: 'Order checked',
-  escalate: 'Human handoff',
+  ticket: 'Opened support ticket',
+  appointment: 'Booked appointment',
+  lead: 'Saved contact',
+  order: 'Checked order',
+  escalate: 'Handed off to a human',
 };
 
 function isSplashDismissed(): boolean {
@@ -249,77 +249,93 @@ export function DemoChatSlot() {
 
   return (
     <>
-      <div className="overflow-hidden border border-[var(--pub-line-strong)] bg-[#0b0f14]">
-        <div className="flex items-center justify-between border-b border-[#1b222c] px-3 py-2 text-[11px] text-[#8a97a6]">
-          <span>Live agent &middot; demo workspace</span>
-          <span>no login</span>
-        </div>
-        {serverUp ? (
-          <iframe
-            src={DEMO_CHAT_SRC}
-            title="Live AI customer support agent demo"
-            className="block h-[520px] w-full border-0"
-            onLoad={() => dismiss()}
-          />
-        ) : (
-          <div
-            className="flex h-[520px] flex-col items-center justify-center gap-3 px-8 text-center"
-            role="status"
-          >
-            <span
-              className="h-5 w-5 animate-spin rounded-full border-2 border-[#2a333f] border-t-[#4c9a83]"
-              aria-hidden="true"
+      <div className="lg:grid lg:grid-cols-[minmax(0,380px,1fr)_260px] lg:items-start lg:gap-8">
+        <div className="overflow-hidden border border-[var(--pub-line-strong)] bg-[#0b0f14]">
+          <div className="flex items-center justify-between border-b border-[#1b222c] px-3 py-2 text-[11px] text-[#8a97a6]">
+            <span>Live agent &middot; demo workspace</span>
+            <span>no login</span>
+          </div>
+          {serverUp ? (
+            <iframe
+              src={DEMO_CHAT_SRC}
+              title="Live AI customer support agent demo"
+              className="block h-[520px] w-full border-0"
+              onLoad={() => dismiss()}
             />
-            <p className="text-[13px] text-[#c9d1db]">The live demo server is waking up…</p>
-            <p className="max-w-[16rem] text-[11px] leading-relaxed text-[#8a97a6]">
-              The chat drops into this window the moment it connects — no account
-              either way.
-            </p>
-           </div>
-         )}
-        <div className="border-t border-[#1b222c]">
-          <div className="px-3 py-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] uppercase tracking-wide text-[#8a97a6]">LangGraph actions</span>
-              {activity.length > 0 && (
-                <span className="text-[11px] text-[#5d6875]">{activity.length} this session</span>
+          ) : (
+            <div
+              className="flex h-[520px] flex-col items-center justify-center gap-3 px-8 text-center"
+              role="status"
+            >
+              <span
+                className="h-5 w-5 animate-spin rounded-full border-2 border-[#2a333f] border-t-[#4c9a83]"
+                aria-hidden="true"
+              />
+              <p className="text-[13px] text-[#c9d1db]">The live demo server is waking up…</p>
+              <p className="max-w-[16rem] text-[11px] leading-relaxed text-[#8a97a6]">
+                The chat drops into this window the moment it connects — no account
+                either way.
+              </p>
+            </div>
+          )}
+        </div>
+
+        <aside className="lg:sticky lg:top-24 self-start">
+          <div className="overflow-hidden border border-[var(--pub-line-strong)] bg-[#0b0f14]">
+            <div className="px-3 py-2">
+              <div className="flex items-baseline justify-between gap-2">
+                <div>
+                  <span className="text-[11px] uppercase tracking-wide text-[#8a97a6]">
+                    What the agent did
+                  </span>
+                  <span className="ml-2 text-[11px] text-[#5d6875]">Live · this session</span>
+                </div>
+                {activity.length > 0 && (
+                  <span className="text-[11px] text-[#5d6875]">{activity.length} this session</span>
+                )}
+              </div>
+              {activity.length === 0 ? (
+                <p className="mt-1 text-[11px] text-[#5d6875]">
+                  As the agent works — opening tickets, booking, saving contacts —
+                  each step will be explained here.
+                </p>
+              ) : (
+                <ul
+                  className="mt-1.5 flex flex-col gap-1"
+                  role="log"
+                  aria-live="polite"
+                  aria-label="What the agent did"
+                >
+                  {activity.map((row) => {
+                    const Icon = ACTION_ICONS[row.action.type];
+                    const prefix = row.action.ok ? '✓ ' : '✗ ';
+                    const idPart = row.action.id ? ` ${row.action.id}` : '';
+                    return (
+                      <li
+                        key={row.key}
+                        className="flex items-start gap-2 text-[11px] leading-snug"
+                      >
+                        <Icon
+                          className={`mt-px h-3 w-3 shrink-0 ${row.action.ok ? 'text-[#4c9a83]' : 'text-[#c96b6b]'}`}
+                          aria-hidden="true"
+                        />
+                        <span
+                          className={row.action.ok ? 'text-[#b9c7c1]' : 'text-[#d8a7ab]'}
+                        >
+                          {prefix}
+                          {ACTION_LABELS[row.action.type]}
+                          {idPart}
+                          {' · '}
+                          {row.action.detail}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
               )}
             </div>
-            {activity.length === 0 ? (
-              <p className="mt-1 text-[11px] text-[#5d6875]">
-                Ticket, booking and lead actions appear here live as the agent runs.
-              </p>
-            ) : (
-              <ul
-                className="mt-1.5 flex flex-col gap-1"
-                role="log"
-                aria-live="polite"
-                aria-label="Agent actions"
-              >
-                {activity.map((row) => {
-                  const Icon = ACTION_ICONS[row.action.type];
-                  const prefix = row.action.ok ? '✓ ' : '✗ ';
-                  const idPart = row.action.id ? ` ${row.action.id}` : '';
-                  return (
-                    <li key={row.key} className="flex items-start gap-2 text-[11px] leading-snug">
-                      <Icon
-                        className={`mt-px h-3 w-3 shrink-0 ${row.action.ok ? 'text-[#4c9a83]' : 'text-[#c96b6b]'}`}
-                        aria-hidden="true"
-                      />
-                      <span className={row.action.ok ? 'text-[#b9c7c1]' : 'text-[#d8a7ab]'}>
-                        {prefix}
-                        {ACTION_LABELS[row.action.type]}
-                        {idPart}
-                        {' — '}
-                        {row.action.detail}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
           </div>
-        </div>
+        </aside>
       </div>
 
       {overlay !== 'gone' && (
