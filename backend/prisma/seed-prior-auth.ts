@@ -8,9 +8,9 @@
  * Company id must match frontend/app/prior-auth/page.tsx COMPANY_ID.
  */
 import { PrismaClient } from '@prisma/client';
-import crypto from 'crypto';
+import { randomUUID } from 'crypto';
 
-export const COMPANY_ID = '85a535c5-2a12-4cef-977e-29f436bbb3f5';
+export const COMPANY_ID = 'd92ae4ed-c4fc-4fdc-9aa6-8dbc49e54bdc';
 
 export const DOCS: { title: string; content: string }[] = [
   {
@@ -66,6 +66,20 @@ function chunkText(text: string, chunkSize = 1000, overlap = 200): string[] {
 async function main() {
   const db = new PrismaClient();
   try {
+    // The FK on documents.company_id needs the tenant row first; the frontend
+    // points at this same id (frontend/app/prior-auth/page.tsx COMPANY_ID).
+    await db.company.upsert({
+      where: { id: COMPANY_ID },
+      update: {},
+      create: {
+        id: COMPANY_ID,
+        name: 'Sample Health Plan (evaluation)',
+        slug: 'sample-health-plan-eval',
+        plan: 'pro',
+        settings: { widgetTheme: 'dark' },
+      },
+    });
+
     for (const doc of DOCS) {
       const existing = await db.document.findFirst({
         where: { companyId: COMPANY_ID, title: doc.title },
@@ -77,7 +91,7 @@ async function main() {
           })
         : await db.document.create({
             data: {
-              id: crypto.randomUUID(),
+              id: randomUUID(),
               companyId: COMPANY_ID,
               title: doc.title,
               content: doc.content,
@@ -91,7 +105,7 @@ async function main() {
       for (let i = 0; i < chunks.length; i++) {
         await db.$executeRaw`
           INSERT INTO chunks (id, document_id, company_id, chunk_index, chunk_text, embedding)
-          VALUES (${crypto.randomUUID()}, ${record.id}, ${COMPANY_ID}, ${i}, ${chunks[i]}, NULL::vector)
+          VALUES (${randomUUID()}, ${record.id}, ${COMPANY_ID}, ${i}, ${chunks[i]}, NULL::vector)
         `;
       }
       console.log(`Seeded: ${doc.title} (${chunks.length} chunks)`);

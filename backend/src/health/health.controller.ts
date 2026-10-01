@@ -19,6 +19,12 @@ export class HealthController {
     } catch {
       db = 'down';
     }
-    return { status: db === 'up' ? 'ok' : 'degraded', db, timestamp: new Date().toISOString() };
+    return {
+      status: db === 'up' ? 'ok' : 'degraded',
+      db,
+      // No long-lived socket on serverless hosts: clients must use REST.
+      ws: !process.env.VERCEL,
+      timestamp: new Date().toISOString(),
+    };
   }
 }

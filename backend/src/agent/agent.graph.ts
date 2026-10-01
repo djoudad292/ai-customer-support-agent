@@ -118,10 +118,11 @@ export class AgentGraph {
     }
     // Space/comma-separated pool: GOOGLE_API_KEY, GOOGLE_API_KEY_2, ... —
     // rotates per call so one exhausted key no longer kills the demo.
+    // Only gemini-2.5-flash is verified reachable from here: the other flash
+    // aliases hung for the full 30s timeout, which burned the whole request
+    // budget before any answer came back.
     const geminiModels = [
       ...(process.env.GEMINI_MODEL ? [process.env.GEMINI_MODEL] : []),
-      'gemini-3.8-flash',
-      'gemini-flash-latest',
       'gemini-2.5-flash',
     ].filter((m, i, a) => a.indexOf(m) === i);
     const geminiKeys = [

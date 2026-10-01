@@ -29,6 +29,41 @@ async function main() {
   });
   console.log('✅ Company created:', company.name);
 
+  // Widget default tenant: the embeddable iframe opens with company=demo when
+  // the host page configures no id, and conversations.company_id has an FK.
+  const widgetCompanyId = 'demo';
+  await prisma.company.upsert({
+    where: { id: widgetCompanyId },
+    update: {},
+    create: {
+      id: widgetCompanyId,
+      name: 'Demo Company',
+      slug: 'demo-widget',
+      plan: 'pro',
+      settings: { widgetTheme: 'dark', autoReply: true }
+    }
+  });
+  await prisma.document.upsert({
+    where: { id: 'demo-company-info' },
+    update: {},
+    create: {
+      id: 'demo-company-info',
+      title: 'Company Info',
+      content: `Demo Company — online store.
+Business hours: Monday-Friday 09:00-17:00 UTC, closed weekends.
+Shipping: standard 3-5 business days, free over $50. Returns: 30 days, refund in 5-7 business days.
+Support: reply within 4 hours for high priority, within 24 hours otherwise. Escalate billing to the finance team.`,
+      filename: 'company-info.txt',
+      mime: 'text/plain',
+      sizeBytes: 340,
+      pageCount: 1,
+      status: 'ready',
+      published: true,
+      companyId: widgetCompanyId
+    }
+  });
+  console.log('✅ Widget tenant created:', widgetCompanyId);
+
   const user = await prisma.user.upsert({
     where: { email: demoEmail },
     update: { passwordHash },

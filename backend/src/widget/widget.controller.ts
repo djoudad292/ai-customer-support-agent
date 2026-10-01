@@ -1,15 +1,24 @@
 import { Controller, Get, Req, Res } from '@nestjs/common';
-import { Response } from 'express';
+import { Request, Response } from 'express';
+
+function publicHost(req: Request): string {
+  if (process.env.PUBLIC_BASE_URL) return process.env.PUBLIC_BASE_URL.replace(/\/$/, '');
+  const proto = (req.headers['x-forwarded-proto'] as string) || req.protocol || 'https';
+  const host = (req.headers['x-forwarded-host'] as string) || req.headers.host || 'localhost:4000';
+  return `${proto}://${host}`;
+}
 
 @Controller()
 export class WidgetController {
   @Get('widget.js')
-  serveWidget(@Res() res: Response) {
-    const host = 'https://ai-customer-support-backend-ldbf.onrender.com';
-
+  serveWidget(@Req() req: Request, @Res() res: Response) {
     const widgetCode = `
 (function() {
-  var WIDGET_HOST = '${host}';
+  // Host is derived from this script's own src, so the snippet keeps working
+  // after every backend move (Render -> Vercel) without editing the host page.
+  var scriptEl = document.currentScript;
+  var WIDGET_HOST = (window.AI_SUPPORT_CONFIG && window.AI_SUPPORT_CONFIG.host)
+    || (scriptEl && scriptEl.src ? new URL(scriptEl.src).origin : '${publicHost(req)}');
   var WIDGET_CONFIG = window.AI_SUPPORT_CONFIG || {};
 
   var iframe = document.createElement('iframe');
@@ -46,8 +55,7 @@ export class WidgetController {
   }
 
   @Get('widget')
-  serveWidgetPage(@Req() req: any, @Res() res: Response) {
-    const host = 'https://ai-customer-support-backend-ldbf.onrender.com';
+  serveWidgetPage(@Req() req: Request, @Res() res: Response) {
     const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -98,39 +106,16 @@ export class WidgetController {
     <button id="send">Send</button>
   </div>
   <script>
-    var WS = null;
     var CONV_ID = null;
     var COMPANY_ID = new URLSearchParams(location.search).get('company') || 'demo';
+    var API = location.origin;
     var ACTION_LABELS = { ticket:'Support ticket', appointment:'Appointment', lead:'Contact saved', order:'Order checked', escalate:'Human handoff' };
 
     var STARTER = new URLSearchParams(location.search).get('starter');
     var STARTER_SENT_KEY = 'supportai-starter-sent';
 
-    function connect() {
-      WS = new WebSocket('${host.replace('https', 'wss')}/ws?company=' + encodeURIComponent(COMPANY_ID));
-      WS.onopen = function() {
-        document.getElementById('status').textContent = 'Online';
-        maybeSendStarter();
-      };
-      WS.onclose = function() {
-        document.getElementById('status').textContent = 'Reconnecting...';
-        setTimeout(connect, 1500);
-      };
-      WS.onmessage = function(e) {
-        var d = JSON.parse(e.data);
-        if (d.type === 'message') {
-          if (d.conversationId) CONV_ID = d.conversationId;
-          addMsg(d.content, 'bot');
-          if (d.executed && d.executed.length) {
-            addActionCard(d.executed);
-            if (window.parent !== window) {
-              window.parent.postMessage({ source:'supportai-widget', kind:'agent-executed', executed:d.executed||[], actionSummary:d.actionSummary||'', action:d.action||null, conversationId:d.conversationId||null }, '*');
-            }
-          }
-        }
-        if (d.type === 'error') addMsg(d.content, 'bot');
-        document.getElementById('typing').style.display = 'none';
-      };
+    function setStatus(text) {
+      document.getElementById('status').textContent = text;
     }
 
     function addMsg(text, who) {
@@ -150,7 +135,7 @@ export class WidgetController {
         el.className = 'action-card' + (a.ok ? '' : ' bad');
         var badge = document.createElement('span');
         badge.className = 'ac-badge';
-        badge.textContent = a.ok ? '\u2713' : '\u2717';
+        badge.textContent = a.ok ? '\\u2713' : '\\u2717';
         el.appendChild(badge);
         var label = ACTION_LABELS[a.type] || a.type;
         if (a.id) {
@@ -159,24 +144,50 @@ export class WidgetController {
           idSpan.textContent = a.id;
           el.appendChild(document.createTextNode(label + ' '));
           el.appendChild(idSpan);
-          el.appendChild(document.createTextNode(' \u2014 ' + a.detail));
+          el.appendChild(document.createTextNode(' \\u2014 ' + a.detail));
         } else {
-          el.appendChild(document.createTextNode(label + ' \u2014 ' + a.detail));
+          el.appendChild(document.createTextNode(label + ' \\u2014 ' + a.detail));
         }
         box.appendChild(el);
       }
       box.scrollTop = box.scrollHeight;
     }
 
+    function receive(d) {
+      if (d.type === 'message') {
+        if (d.conversationId) CONV_ID = d.conversationId;
+        addMsg(d.content, 'bot');
+        if (d.executed && d.executed.length) {
+          addActionCard(d.executed);
+          if (window.parent !== window) {
+            window.parent.postMessage({ source:'supportai-widget', kind:'agent-executed', executed:d.executed||[], actionSummary:d.actionSummary||'', action:d.action||null, conversationId:d.conversationId||null }, '*');
+          }
+        }
+      }
+      if (d.type === 'error') addMsg(d.content, 'bot');
+      document.getElementById('typing').style.display = 'none';
+    }
+
     function send() {
       var inp = document.getElementById('inp');
       var text = inp.value.trim().slice(0, 2000);
       if (!text) return;
-      if (!WS || WS.readyState !== 1) { addMsg('Still connecting — try again in a second.', 'bot'); return; }
       addMsg(text, 'user');
       inp.value = '';
       document.getElementById('typing').style.display = 'flex';
-      WS.send(JSON.stringify({ event: 'chat', data: { message: text, conversationId: CONV_ID } }));
+      setStatus('Online');
+      fetch(API + '/widget/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text, conversationId: CONV_ID, companyId: COMPANY_ID })
+      }).then(function(res) {
+        if (!res.ok) throw new Error('http ' + res.status);
+        return res.json();
+      }).then(receive).catch(function() {
+        addMsg('Sorry, something went wrong. Please try again.', 'bot');
+        document.getElementById('typing').style.display = 'none';
+        setStatus('Reconnecting...');
+      });
     }
 
     function maybeSendStarter() {
@@ -189,7 +200,13 @@ export class WidgetController {
 
     document.getElementById('send').onclick = send;
     document.getElementById('inp').onkeydown = function(e) { if (e.key === 'Enter') send(); };
-    connect();
+
+    // REST-only transport: no long-lived socket to babysit, so a plain health
+    // probe replaces the old onopen/onclose status handling.
+    fetch(API + '/health').then(function(r) { return r.ok; }).then(function(ok) {
+      if (ok) setStatus('Online');
+      maybeSendStarter();
+    }).catch(function() { setStatus('Reconnecting...'); });
   </script>
 </body>
 </html>`;

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import {
   WebSocketGateway,
   WebSocketServer,
@@ -10,13 +10,18 @@ import {
 } from '@nestjs/websockets';
 import { IncomingMessage } from 'http';
 import { Server, WebSocket } from 'ws';
-import { AgentService } from '../agent/agent.service';
+import { WidgetChatService } from '../widget/widget-chat.service';
 
 interface WidgetSocket extends WebSocket {
   companyId?: string;
   conversationId?: string;
 }
 
+/**
+ * Thin transport: framing and connection state only. The guest-isolation rule
+ * and the message/error payload shape live in WidgetChatService so the REST
+ * endpoint cannot drift from this socket path.
+ */
 @Injectable()
 @WebSocketGateway({
   cors: { origin: '*' },
@@ -28,9 +33,7 @@ export class WidgetGateway
   @WebSocketServer()
   server: Server;
 
-  private logger = new Logger(WidgetGateway.name);
-
-  constructor(private agentService: AgentService) {}
+  constructor(private widgetChat: WidgetChatService) {}
 
   handleConnection(client: WidgetSocket, request?: IncomingMessage) {
     const rawUrl = client.url || request?.url || '/';
@@ -58,56 +61,23 @@ export class WidgetGateway
     @ConnectedSocket() client: WidgetSocket,
     @MessageBody() data: { message: string; conversationId?: string | null },
   ) {
-    const message = typeof data?.message === 'string' ? data.message.trim() : '';
-    if (!message) return;
-
-    const companyId = client.companyId;
-    if (!companyId) {
-      client.send(JSON.stringify({ type: 'error', content: 'Missing company' }));
-      return;
-    }
-
-    // Guest isolation: a socket may only continue the conversation it created.
-    // A client-supplied id is never trusted on its own — otherwise a leaked
-    // conversationId would let a visitor append to (or read back) someone
-    // else's thread inside the same company workspace.
+    // A socket may only continue the conversation it created: a client-supplied
+    // id is never trusted on its own, otherwise a leaked conversationId would
+    // let a visitor append to (or read back) someone else's thread.
     const conversationId =
       data.conversationId && data.conversationId === client.conversationId
         ? data.conversationId
         : undefined;
 
-    try {
-      const result = await this.agentService.chat(
-        companyId,
-        conversationId || crypto.randomUUID(),
-        message,
-      );
-      client.conversationId = result.conversationId;
+    const payload = await this.widgetChat.run({
+      companyId: client.companyId,
+      conversationId,
+      message: typeof data?.message === 'string' ? data.message : '',
+    });
 
-      // Cited = response references sourced rules (criterion/page/section markers).
-      // The prior-auth demo only logs "cited evaluation" when this is true.
-      const cited = /(criteri|§\s*|page\s+\d|section\s+[a-z]|[MBR]-\d)/i.test(result.response || '');
-
-      client.send(
-        JSON.stringify({
-          type: 'message',
-          conversationId: result.conversationId,
-          content: result.response,
-          action: result.action || null,
-          actionSummary: result.actionSummary || '',
-          executed: Array.isArray(result.executed) ? result.executed : [],
-          cited,
-        }),
-      );
-    } catch (err) {
-      const code = (err as Error).message || '';
-      this.logger.error(`Widget chat failed: ${code}`);
-      // Distinct honest errors (frontend retries on these) instead of one
-      // generic message that hides whether it is data or provider failure.
-      const content = code.includes('NO_CRITERIA')
-        ? 'No criteria documents are loaded for this evaluation yet. Please retry in a minute or book a live run.'
-        : 'Sorry, something went wrong. Please try again.';
-      client.send(JSON.stringify({ type: 'error', content, code }));
+    if (payload.type === 'message' && payload.conversationId) {
+      client.conversationId = payload.conversationId;
     }
+    client.send(JSON.stringify(payload));
   }
 }
