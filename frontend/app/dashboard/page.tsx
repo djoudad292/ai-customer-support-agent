@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, API_BASE } from "@/lib/api";
 import { GitBranch, MessageSquare, Ticket, BookOpen, Settings, Package, ClipboardList, CalendarDays, Download } from "lucide-react";
 import { Card, CardHeader, CardTitle, Button, Badge, Spinner } from "@supportai/ui/web";
 
@@ -51,7 +51,7 @@ export default function DashboardPage() {
         <CardHeader className="px-0"><CardTitle>Widget Setup</CardTitle></CardHeader>
         <p className="mb-3 text-sm text-muted">Add this to your website to embed the AI chat widget:</p>
         <code className="block rounded-xl bg-surface-alt p-3 text-xs text-success overflow-x-auto font-mono">
-          {`<script src="https://ai-customer-support-backend-ldbf.onrender.com/widget.js"></script>`}
+          {`<script src="${API_BASE}/widget.js"></script>`}
         </code>
         <p className="mt-2 text-xs text-muted">Optionally configure: <code className="text-fg-secondary">window.AI_SUPPORT_CONFIG = {"{'}"} companyId: "your-id" {"}"};</code></p>
       </Card>

@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { ShieldCheck, FileText, UserCheck, AlertTriangle, CheckCircle2, XCircle, Clock, Stethoscope } from "lucide-react";
 
 // Seeded tenant holding the SAMPLE MRI/biologic/referral criteria docs
 // (backend/prisma/seed-prior-auth.ts). Old id 85a535c5-… had an empty KB.
 const COMPANY_ID = "d92ae4ed-c4fc-4fdc-9aa6-8dbc49e54bdc";
-const WS_URL = "wss://ai-customer-support-backend-ldbf.onrender.com/ws?company=" + COMPANY_ID;
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "https://ai-customer-support-backend-ldbf.onrender.com").replace(/\/$/, "");
 
 const CASES = [
   {
@@ -47,27 +47,11 @@ export default function PriorAuthDemo() {
   const [status, setStatus] = useState("");
   const [decision, setDecision] = useState<string | null>(null);
   const [audit, setAudit] = useState<AuditEntry[]>([]);
-  const wsRef = useRef<WebSocket | null>(null);
   const convRef = useRef<string | null>(null);
 
   const stamp = () => new Date().toLocaleTimeString();
 
   const log = (text: string) => setAudit((a) => [...a, { time: stamp(), text }]);
-
-  const ensureWs = () =>
-    new Promise<WebSocket>((resolve, reject) => {
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) return resolve(wsRef.current);
-      const ws = new WebSocket(WS_URL);
-      ws.onopen = () => {
-        wsRef.current = ws;
-        resolve(ws);
-      };
-      ws.onerror = () => reject(new Error("connect failed"));
-    });
-
-  useEffect(() => {
-    return () => wsRef.current?.close();
-  }, []);
 
   async function runCheck() {
     setLoading(true);
@@ -75,55 +59,42 @@ export default function PriorAuthDemo() {
     setDecision(null);
     setStatus("");
     log(`Check started for case: ${activeCase.title}`);
-    // Free-tier backend sleeps when idle: first hit often fails or crawls.
-    // Retry with backoff instead of one silent 90s hang.
     const waits = [0, 5000, 15000];
     for (let attempt = 0; attempt < waits.length; attempt++) {
       if (attempt > 0) {
-        setStatus(`Backend warming up — retry ${attempt} of ${waits.length - 1}…`);
-        log(`Retry ${attempt}: waiting ${waits[attempt] / 1000}s for cold backend`);
+        setStatus(`Retrying — attempt ${attempt + 1} of ${waits.length}…`);
+        log(`Retry ${attempt}: waiting ${waits[attempt] / 1000}s after a failed attempt`);
         await new Promise((r) => setTimeout(r, waits[attempt]));
       } else {
-        setStatus("Connecting to evaluation backend…");
+        setStatus("Sending request to the evaluation agent…");
       }
       try {
-        const ws = await ensureWs();
-        setStatus("Agent reading criteria documents…");
-        const { content, cited } = await new Promise<{ content: string; cited: boolean }>((resolve, reject) => {
-          const timer = setTimeout(() => reject(new Error("timeout")), 60000);
-          ws.onmessage = (e) => {
-            try {
-              const d = JSON.parse(e.data);
-              if (d.type === "connected" && d.conversationId) convRef.current = d.conversationId;
-              if (d.type === "error") {
-                clearTimeout(timer);
-                reject(new Error("backend-error"));
-              }
-              if (d.type === "message") {
-                clearTimeout(timer);
-                resolve({ content: d.content, cited: !!d.cited });
-              }
-            } catch {
-              /* ignore malformed frames */
-            }
-          };
-          ws.send(JSON.stringify({ event: "chat", data: { message: activeCase.prompt, conversationId: convRef.current, companyId: COMPANY_ID } }));
+        const res = await fetch(`${API_BASE}/widget/chat`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: activeCase.prompt,
+            conversationId: convRef.current,
+            companyId: COMPANY_ID,
+          }),
         });
-        setAnswer(content);
+        if (!res.ok) throw new Error(`http ${res.status}`);
+        const d = (await res.json()) as { type: string; content: string; cited?: boolean; conversationId?: string | null };
+        if (d.type === "error") throw new Error("backend-error");
+        if (d.conversationId) convRef.current = d.conversationId;
+        setAnswer(d.content);
         // Honest audit: only claim a *cited* evaluation when the backend
         // flagged citations. A citation-less answer is a draft, not a decision.
-        if (cited) log("Agent returned cited evaluation");
+        if (d.cited) log("Agent returned cited evaluation");
         else log("Agent answered without citations — treat as draft, not a decision");
         setStatus("");
         setLoading(false);
         return;
       } catch (err) {
         log(`Attempt ${attempt + 1} failed (${err instanceof Error ? err.message : "unknown"})`);
-        try { wsRef.current?.close(); } catch { /* ignore */ }
-        wsRef.current = null;
       }
     }
-    setAnswer("The evaluation backend did not respond after 3 attempts (free-tier hosting sleeps when idle, or all LLM providers errored). The criteria documents and review flow below still show exactly how the walkthrough works — retry in a minute, or book a live call and I will run it with you.");
+    setAnswer("The evaluation backend did not respond after 3 attempts (the LLM providers backing it were unavailable). The criteria documents and review flow below still show exactly how the walkthrough works — retry in a minute, or book a live call and I will run it with you.");
     log("Backend unavailable after 3 attempts — asked visitor to retry or book live run");
     setStatus("");
     setLoading(false);
