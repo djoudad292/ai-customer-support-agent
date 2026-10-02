@@ -46,6 +46,10 @@ export const AgentState = Annotation.Root({
     reducer: (current, update) => update || current,
     default: () => 'neutral',
   }),
+  retrievalMode: Annotation<string>({
+    reducer: (current, update) => update || current,
+    default: () => 'unknown',
+  }),
   response: Annotation<string>(),
   responseMetadata: Annotation<Record<string, any> | null>({
     reducer: (current, update) => update ?? current,
@@ -211,13 +215,17 @@ export class AgentGraph {
     if (!query) return { messages: [] };
 
     try {
-      const chunks = await this.knowledgeBase.searchChunks(state.companyId, query);
-      if (chunks.length > 0) {
-        const context = chunks.join('\n\n');
+      const { results, mode } = await this.knowledgeBase.searchChunks(state.companyId, query);
+      if (results.length > 0) {
+        const context = results.map((r) => r.text).join('\n\n');
         return {
+          // Surfaced in the chat payload so a keyword-degraded answer is
+          // visible instead of silently posing as semantic retrieval.
+          retrievalMode: mode,
           messages: [{ role: 'system', content: `Knowledge base context (answer from this when relevant):\n${context}` }],
         };
       }
+      return { retrievalMode: mode };
     } catch (error) {
       this.logger.warn(`Knowledge retrieval failed: ${error}`);
     }
@@ -665,6 +673,7 @@ Examples of good responses:
       pendingActionData: null,
       actionSummary: '',
       sentiment: 'neutral',
+      retrievalMode: 'unknown',
       response: '',
       responseMetadata: null,
     });
@@ -677,6 +686,7 @@ Examples of good responses:
       actionSummary: result.actionSummary,
       executed: result.executed ?? [],
       sentiment: result.sentiment,
+      retrievalMode: result.retrievalMode ?? 'unknown',
       responseMetadata: result.responseMetadata,
     };
   }

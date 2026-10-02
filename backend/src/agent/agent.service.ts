@@ -75,7 +75,7 @@ export class AgentService {
     // a full LLM router round-trip (~20-30s) and guarantees citation-shaped
     // output instead of conversational chatter.
     if (/evaluate\b.*\bcriteria/i.test(message)) {
-      const response = await this.evaluateWithCitations(companyId, message);
+      const { response, mode } = await this.evaluateWithCitations(companyId, message);
       await this.prisma.message.create({
         data: {
           id: crypto.randomUUID(),
@@ -85,7 +85,7 @@ export class AgentService {
           content: response,
         },
       });
-      return { conversationId, response, action: null, actionSummary: '', executed: [], trace: this.trace, metadata: null };
+      return { conversationId, response, action: null, actionSummary: '', executed: [], trace: this.trace, metadata: null, retrievalMode: mode };
     }
 
     const history = conversation?.messages.map((m) => ({
@@ -125,6 +125,7 @@ export class AgentService {
         executed: Array.isArray(result.executed) ? result.executed : [],
         trace: this.trace,
         metadata: result.responseMetadata ?? null,
+        retrievalMode: result.retrievalMode ?? 'unknown',
       };
     }
 
@@ -148,6 +149,7 @@ export class AgentService {
       executed: Array.isArray(state.executed) ? state.executed : [],
       trace: this.trace,
       metadata: state.responseMetadata ?? null,
+      retrievalMode: state.retrievalMode || 'unknown',
     };
   }
 
@@ -156,8 +158,12 @@ export class AgentService {
    * Throws NO_CRITERIA when nothing relevant is stored (honest failure),
    * or LLM_UNAVAILABLE when all providers fail — never a fake answer.
    */
-  private async evaluateWithCitations(companyId: string, request: string): Promise<string> {
-    const chunks = await this.knowledgeBase.searchChunks(companyId, request);
+  private async evaluateWithCitations(
+    companyId: string,
+    request: string,
+  ): Promise<{ response: string; mode: string }> {
+    const { results: chunks, mode } = await this.knowledgeBase.searchChunks(companyId, request);
+    this.logger.log(`Evaluation retrieval mode: ${mode}`);
     if (!chunks.length) {
       throw new Error('NO_CRITERIA');
     }
@@ -166,7 +172,7 @@ Use ONLY the criteria below. Cite every rule you apply as [Criterion X-N] with i
 If the request lacks information a criterion needs, state exactly what is missing and route to the exception queue / human review. Never invent criteria.
 
 CRITERIA:
-${chunks.join('\n\n')}
+${chunks.map((c) => c.text).join('\n\n')}
 
 REQUEST:
 ${request}
@@ -175,12 +181,13 @@ Respond in exactly this shape:
 1) Recommendation: APPROVE / NEEDS MORE INFO / FLAG FOR HUMAN REVIEW (one line)
 2) Criteria applied: each with [Criterion X-N] + page/section
 3) Missing: list, or "None"`;
-    return this.agentGraph.invokeLlm(
+    const response = await this.agentGraph.invokeLlm(
       [
         { role: 'system', content: 'You evaluate prior-authorization requests against supplied sample criteria, with citations.' },
         { role: 'user', content: prompt },
       ],
       { maxTokens: 1024, temperature: 0 },
     );
+    return { response, mode };
   }
 }

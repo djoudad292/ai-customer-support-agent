@@ -1,5 +1,6 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
+import { ensureVectorSchema } from './vector-schema';
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
@@ -17,6 +18,9 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
         await this.$connect();
+        // pgvector extension + HNSW index for semantic retrieval. Idempotent
+        // and non-fatal: never let it stop the app from serving.
+        await ensureVectorSchema(this);
         return;
       } catch (err) {
         if (attempt === maxAttempts) throw err;

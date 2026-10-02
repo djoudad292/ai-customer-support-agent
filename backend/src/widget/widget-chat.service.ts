@@ -10,6 +10,8 @@ export interface WidgetChatPayload {
   actionSummary?: string;
   executed?: unknown[];
   cited?: boolean;
+  /** 'vector' = pgvector cosine search, 'keyword-degraded' = no embeddings available. */
+  retrievalMode?: string;
   code?: string;
 }
 
@@ -61,6 +63,7 @@ export class WidgetChatService {
         actionSummary: result.actionSummary || '',
         executed: Array.isArray(result.executed) ? (result.executed as unknown[]) : [],
         cited,
+        retrievalMode: result.retrievalMode || 'unknown',
       };
     } catch (err) {
       const code = (err as Error).message || '';
